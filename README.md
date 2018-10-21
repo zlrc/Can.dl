@@ -1,4 +1,6 @@
-![bot-icon]
+<p align="center">
+  <img src="https://imgur.com/tF9Gz3I.png" height=350px>
+</p>
 # Can.dl Discord Bot
 A personal, niche-purpose bot with features intended to fit specific needs of small to moderate-sized servers. Works best when paired with another bot that comes with a standard set of commands.
 
@@ -40,7 +42,6 @@ The code for this bot runs on Python 3. You should be allowed to use the code fr
     Terminal=true
     StartupNotify=false
 
-[bot-icon]: https://imgur.com/tF9Gz3I.png
 [groups]: https://imgur.com/NyXfOPq.png
 [invite]: https://imgur.com/bLVCJet.png
 [countdown]: https://imgur.com/SbJ4Rwy.png
