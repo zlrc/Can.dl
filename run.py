@@ -9,7 +9,9 @@ client = discord.Client()
 bot = commands.Bot(command_prefix='c|')
 builtins.bot = bot
 
-# Logging System
+
+
+## Logging System
 import logging
 
 logger = logging.getLogger('discord')
@@ -33,7 +35,8 @@ backup = sys.stdout # sys.stdout = backup to revert back to printing to console 
 sys.stdout = Tee(sys.stdout, f)
 
 
-# Loading up the config, refer to the readme file if missing.
+
+## Loading up the config, refer to the readme file if missing.
 with open("config.json") as cfg:
     config = json.load(cfg)
 
@@ -45,7 +48,9 @@ import modules.admin
 import modules.utility
 import modules.fun
 
-# Now we're ready to start up the bot
+
+
+## Now we're ready to start up the bot
 @bot.event
 async def on_ready():
     print('Logged in as')
