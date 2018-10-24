@@ -40,10 +40,12 @@ def tomarkov(string, states):
     return markov_string;
 
 @bot.command(pass_context=True)
-@commands.cooldown(1,15, commands.BucketType.channel)
+@commands.cooldown(1,12, commands.BucketType.channel)
 async def markov(ctx, numOfMsgs=500, state_size=2):
     """ Generates a Markov Chain from recent messages."""
+
     await bot.send_typing(ctx.message.channel)
+
     if (numOfMsgs <= 50000 and numOfMsgs > 1): # to prevent overflow and exceptions
         log = bot.logs_from(ctx.message.channel, limit=numOfMsgs) # grabs last n messages
 

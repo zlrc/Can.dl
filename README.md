@@ -27,6 +27,7 @@ The code for this bot runs on Python 3. You should be allowed to use the code fr
 ### Dependencies:
 - Python 3
 - [discord.py](https://github.com/rapptz/discord.py)
+- [markovify](https://github.com/jsvine/markovify)
 
 <i style="font-size: 10.5pt; color: rgb(200,0,0)">* Please let me know if there are any other dependencies that I need to include.</i>
 
