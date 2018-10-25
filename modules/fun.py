@@ -25,11 +25,14 @@ def convert_to_url(url):
 
 
 ## Markov Chains
-def tomarkov(string, states):
+def tomarkov(string):
     """Returns a randomly generated sentence from the string provided"""
 
+    # Generate a random state size between 2 and 4
+    #states = random.randint(2,4)
+
     # Build the model
-    string_model = markovify.NewlineText(string, retain_original=False, state_size=states)
+    string_model = markovify.NewlineText(string, retain_original=False, state_size=2)
 
     # Construct the requested sentence(s)
     markov_string = ""
@@ -40,14 +43,39 @@ def tomarkov(string, states):
     return markov_string;
 
 @bot.command(pass_context=True)
-@commands.cooldown(1,12, commands.BucketType.channel)
-async def markov(ctx, numOfMsgs=500, state_size=2):
+@commands.cooldown(2,20, commands.BucketType.channel)
+async def markov(ctx, user=None):
     """ Generates a Markov Chain from recent messages."""
 
     await bot.send_typing(ctx.message.channel)
 
-    if (numOfMsgs <= 50000 and numOfMsgs > 1): # to prevent overflow and exceptions
-        log = bot.logs_from(ctx.message.channel, limit=numOfMsgs) # grabs last n messages
+    # Compile a string of messages that meet the criteria
+    if user: # if a user is given as an argument
+
+        if ctx.message.mentions: # checks if a mention was used
+            member = ctx.message.mentions[0]
+        else: # if mention wasn't used
+            member = ctx.message.server.get_member_named(user)
+
+        log = bot.logs_from(ctx.message.channel, 3000) # grabs last n messages
+
+        # Put all of the valid messages together as a single string
+        string = ""
+        async for i in log: # for every message in the log
+            if (i.author.id == member.id) and (not "c|" in i.clean_content):
+                string += i.clean_content + "\n"
+
+        # Create an embed to simulate a user quote
+        embed = discord.Embed(color=member.color, description=tomarkov(string))
+        embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
+
+        # Send results
+        await bot.send_typing(ctx.message.channel)
+        await bot.send_message(ctx.message.channel,embed=embed)
+
+    else:
+
+        log = bot.logs_from(ctx.message.channel, 800) # grabs last n messages
 
         # Put all of the valid messages together as a single string
         string = ""
@@ -57,14 +85,15 @@ async def markov(ctx, numOfMsgs=500, state_size=2):
 
         # Send results
         await bot.send_typing(ctx.message.channel)
-        await bot.send_message(ctx.message.channel, tomarkov(string, state_size) )
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **That number is invalid! Try something else.**")
+        await bot.send_message(ctx.message.channel, tomarkov(string) )
 
 @markov.error
 async def markov(error,ctx):
     print(">>",ctx.message.author,"attempted to run markov, but failed:",error)
-    await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    else:
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user` **(user is optional)**")
 
 
 
