@@ -42,39 +42,77 @@ def tomarkov(string):
     # Return the final string
     return markov_string;
 
+async def markovuser(message, member, target_channel):
+    """Runs when c|markov is targeted to a particular user"""
+    log = bot.logs_from(target_channel, 3000) # grabs last n messages
+
+    # Put all of the valid messages together as a single string
+    string = ""
+    async for i in log: # for every message in the log
+        if (i.author.id == member.id) and (not "c|" in i.clean_content):
+            string += i.clean_content + "\n"
+
+    # Create an embed to simulate a user quote
+    embed = discord.Embed(color=member.color, description=tomarkov(string))
+    embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
+
+    # Send results
+    await bot.send_typing(message.channel)
+    await bot.send_message(message.channel,embed=embed)
+
+async def markovchannel(message, target_channel):
+    """Runs when c|markov is targeted to a particular channel"""
+    log = bot.logs_from(target_channel, 800) # grabs last n messages
+
+    # Put all of the valid messages together as a single string
+    string = ""
+    async for i in log: # for every message in the log
+        if (i.author != bot.user) and (not "c|" in i.clean_content):
+            string += i.clean_content + "\n"
+
+    # Send results
+    await bot.send_typing(message.channel)
+    await bot.send_message(message.channel, tomarkov(string) )
+
 @bot.command(pass_context=True)
-@commands.cooldown(2,20, commands.BucketType.channel)
-async def markov(ctx, user=None):
+@commands.cooldown(2,18, commands.BucketType.channel)
+async def markov(ctx, user=None, chan=None):
     """ Generates a Markov Chain from recent messages."""
+
+    # Convert channel to an object we can work with
+    if chan: # sets default channel if one isn't provided
+        chan = ctx.message.server.get_channel(chan[2:-1])
+    else:
+        chan = ctx.message.channel
 
     await bot.send_typing(ctx.message.channel)
 
+    def user_is(type, u): # bypasses TypeError exception when user=None
+        if type == "channel":
+            try:
+                if ctx.message.server.get_channel(u[2:-1]):
+                    return True
+                else:
+                    return False
+            except TypeError:
+                return False
+        elif type == "member":
+            try:
+                if ctx.message.server.get_member_named(user):
+                    return True
+                else:
+                    return False
+            except TypeError:
+                return False
+
     # Compile a string of messages that meet the criteria
-    if user: # if a user is given as an argument
-
-        if ctx.message.mentions: # checks if a mention was used
-            member = ctx.message.mentions[0]
-        else: # if mention wasn't used
-            member = ctx.message.server.get_member_named(user)
-
-        log = bot.logs_from(ctx.message.channel, 3000) # grabs last n messages
-
-        # Put all of the valid messages together as a single string
-        string = ""
-        async for i in log: # for every message in the log
-            if (i.author.id == member.id) and (not "c|" in i.clean_content):
-                string += i.clean_content + "\n"
-
-        # Create an embed to simulate a user quote
-        embed = discord.Embed(color=member.color, description=tomarkov(string))
-        embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
-
-        # Send results
-        await bot.send_typing(ctx.message.channel)
-        await bot.send_message(ctx.message.channel,embed=embed)
-
+    if ctx.message.mentions: # checks if a mention was used
+        await markovuser(ctx.message, ctx.message.mentions[0], chan)
+    elif user_is("member", user): # if mention wasn't used to find user
+        await markovuser(ctx.message, ctx.message.server.get_member_named(user), chan)
+    elif user_is("channel", user): # if a channel was given without user mention
+        await markovchannel(ctx.message, ctx.message.server.get_channel(user[2:-1]))
     else:
-
         log = bot.logs_from(ctx.message.channel, 800) # grabs last n messages
 
         # Put all of the valid messages together as a single string
@@ -93,7 +131,7 @@ async def markov(error,ctx):
     if isinstance(error, commands.CommandOnCooldown):
         await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
     else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user` **(user is optional)**")
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user #channel` **(user and channel optional)**")
 
 
 
