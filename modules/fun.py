@@ -32,19 +32,22 @@ def tomarkov(string):
     #states = random.randint(2,4)
 
     # Build the model
-    string_model = markovify.NewlineText(string, retain_original=False, state_size=2)
+    string_model = markovify.NewlineText(string, retain_original=True, state_size=2)
 
     # Construct the requested sentence(s)
     markov_string = ""
     for i in range(random.randint(1,5)): # 1 to 5 sentences are strung together
-        markov_string += str(string_model.make_sentence(tries=15)) + " "
+        markov_string += str(string_model.make_sentence(tries=100)) + " "
 
     # Return the final string
-    return markov_string;
+    if "None" in markov_string:
+        return "❌ | **Error! Failed to generate markov chain, post some more before trying again.**"
+    else:
+        return markov_string;
 
 async def markovuser(message, member, target_channel):
     """Runs when c|markov is targeted to a particular user"""
-    log = bot.logs_from(target_channel, 3000) # grabs last n messages
+    log = bot.logs_from(target_channel, 5000) # grabs last n messages
 
     # Put all of the valid messages together as a single string
     string = ""
@@ -62,7 +65,7 @@ async def markovuser(message, member, target_channel):
 
 async def markovchannel(message, target_channel):
     """Runs when c|markov is targeted to a particular channel"""
-    log = bot.logs_from(target_channel, 800) # grabs last n messages
+    log = bot.logs_from(target_channel, 1000) # grabs last n messages
 
     # Put all of the valid messages together as a single string
     string = ""
@@ -75,9 +78,11 @@ async def markovchannel(message, target_channel):
     await bot.send_message(message.channel, tomarkov(string) )
 
 @bot.command(pass_context=True)
-@commands.cooldown(2,18, commands.BucketType.channel)
+@commands.cooldown(2,20, commands.BucketType.channel)
 async def markov(ctx, user=None, chan=None):
     """ Generates a Markov Chain from recent messages."""
+
+    print(">>",ctx.message.author,"requested a markov chain, processing...") # log command usage
 
     # Convert channel to an object we can work with
     if chan: # sets default channel if one isn't provided

@@ -13,7 +13,7 @@ conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
 
 
 async def addgroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles:
+    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
         await bot.send_typing(ctx.message.channel)
         roles = list(ctx.message.server.roles)
         s = ""
@@ -64,10 +64,10 @@ async def addgroup(ctx, x):
                 await bot.delete_message(rolelist)
 
     else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" permission in order to use this command!**")
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
 
 async def removegroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles:
+    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
         conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
         c = conn.cursor()
 
@@ -119,7 +119,7 @@ async def removegroup(ctx, x):
                 conn.close()
 
     else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" permission in order to use this command!**")
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
 
 async def joingroup(ctx, x):
     botperms = ctx.message.channel.permissions_for(ctx.message.server.me)
@@ -294,7 +294,7 @@ async def group(error, ctx):
 async def help(ctx):
     helpmsg = discord.Embed(color=0xe0216a, url=" ", description="All commands must start with **c|** (e.g. *c|help*).")
 
-    helpmsg.set_author(name="🕯️ Can.dl Commands")
+    helpmsg.set_author(name="🕯️ "+bot.user.name+" Commands")
     helpmsg.set_footer(text="[Page 1 of 1]")
 
     helpmsg.add_field(name="Default:", value="`group` - Provides options for roles that a user can assign themselves without the need of a 'Manage Roles' permission (i.e. voluntary roles like colors and whatnot). Available roles can be configured by an admin. \n`help` - Pulls up this message. \n`ping` - Responds with 'pong!', used to check response time of the bot. \n`someone` - mentions a random user with the included message. \ne.g. *\"c|someone hello there!\"* \n   ")
