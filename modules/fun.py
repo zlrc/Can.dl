@@ -7,7 +7,10 @@ import aiohttp
 from io import BytesIO
 import re
 import requests
+import random
 from bs4 import BeautifulSoup
+import markovify
+
 
 def convert_to_url(url):
 
@@ -20,6 +23,126 @@ def convert_to_url(url):
     return url
 
 
+
+## Markov Chains
+def tomarkov(string):
+    """Returns a randomly generated sentence from the string provided"""
+
+    # Generate a random state size between 2 and 4
+    #states = random.randint(2,4)
+
+    # Build the model
+    string_model = markovify.NewlineText(string, retain_original=True, state_size=2)
+
+    # Construct the requested sentence(s)
+    markov_string = ""
+    for i in range(random.randint(1,5)): # 1 to 5 sentences are strung together
+        markov_string += str(string_model.make_sentence(tries=100)) + " "
+
+    # Return the final string
+    if "None" in markov_string:
+        return "❌ | **Error! Failed to generate markov chain, post some more before trying again.**"
+    else:
+        return markov_string;
+
+async def markovuser(message, member, target_channel):
+    """Runs when c|markov is targeted to a particular user"""
+    log = bot.logs_from(target_channel, 5000) # grabs last n messages
+
+    # Put all of the valid messages together as a single string
+    string = ""
+    async for i in log: # for every message in the log
+        if (i.author.id == member.id) and (not "c|" in i.clean_content):
+            string += i.clean_content + "\n"
+
+    # Create an embed to simulate a user quote
+    embed = discord.Embed(color=member.color, description=tomarkov(string))
+    embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
+
+    # Send results
+    await bot.send_typing(message.channel)
+    await bot.send_message(message.channel,embed=embed)
+
+async def markovchannel(message, target_channel):
+    """Runs when c|markov is targeted to a particular channel"""
+    log = bot.logs_from(target_channel, 1000) # grabs last n messages
+
+    # Put all of the valid messages together as a single string
+    string = ""
+    async for i in log: # for every message in the log
+        if (i.author != bot.user) and (not "c|" in i.clean_content):
+            string += i.clean_content + "\n"
+
+    # Send results
+    await bot.send_typing(message.channel)
+    await bot.send_message(message.channel, tomarkov(string) )
+
+@bot.command(pass_context=True)
+@commands.cooldown(2,20, commands.BucketType.channel)
+async def markov(ctx, user=None, chan=None):
+    """ Generates a Markov Chain from recent messages."""
+
+    print(">> {} requested a markov chain, processing...".format(ctx.message.author)) # log command usage
+
+    # Convert channel to an object we can work with
+    if chan: # sets default channel if one isn't provided
+        chan = ctx.message.server.get_channel(chan[2:-1])
+    else:
+        chan = ctx.message.channel
+
+    await bot.send_typing(ctx.message.channel)
+
+    def user_is(type, u): # bypasses TypeError exception when user=None
+        if type == "channel":
+            try:
+                if ctx.message.server.get_channel(u[2:-1]):
+                    return True
+                else:
+                    return False
+            except TypeError:
+                return False
+        elif type == "member":
+            try:
+                if ctx.message.server.get_member_named(user):
+                    return True
+                else:
+                    return False
+            except TypeError:
+                return False
+
+    # Compile a string of messages that meet the criteria
+    if ctx.message.mentions: # checks if a mention was used
+        await markovuser(ctx.message, ctx.message.mentions[0], chan)
+    elif user_is("member", user): # if mention wasn't used to find user
+        await markovuser(ctx.message, ctx.message.server.get_member_named(user), chan)
+    elif user_is("channel", user): # if a channel was given without user mention
+        await markovchannel(ctx.message, ctx.message.server.get_channel(user[2:-1]))
+    else:
+        log = bot.logs_from(ctx.message.channel, 800) # grabs last n messages
+
+        # Put all of the valid messages together as a single string
+        string = ""
+        async for i in log: # for every message in the log
+            if (i.author != bot.user) and (not "c|" in i.clean_content):
+                string += i.clean_content + "\n"
+
+        # Send results
+        await bot.send_typing(ctx.message.channel)
+        await bot.send_message(ctx.message.channel, tomarkov(string) )
+
+@markov.error
+async def markov(error,ctx):
+    print(">> {} attempted to run c|markov, but failed: {}".format(ctx.message.author,error))
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    elif isinstance(error, commands.CheckFailure):
+        pass
+    else:
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user #channel` **(user and channel optional)**")
+
+
+
+## Stack Overflow Lookup
 @bot.command(pass_context=True)
 async def stack(ctx, *,args):
     """
@@ -37,10 +160,12 @@ async def stack(ctx, *,args):
 
 @stack.error
 async def stack(error,ctx):
-    print(error)
+    print(">> c|stack: {}".format(error))
     await bot.send_message(ctx.message.channel,"❌ | **Please enter a valid search query!**")
 
 
+
+## TV Tropes
 @bot.command(pass_context=True)
 async def trope(ctx, *,args=None):
     """
@@ -51,5 +176,5 @@ async def trope(ctx, *,args=None):
     if not args:
 
         # Opens up a random page through a special url, saves it as the variable: "url"
-        async with aiohttp.get("http://tvtropes.org/pmwiki/randomitem.php?p=1") as url:
+        async with aiohttp.get("http://tvtropes.org/pmwiki/randomitem.php?p="+str(random.randint(1,9999999999))) as url:
             await bot.send_message(ctx.message.channel, "{}".format(url.url))

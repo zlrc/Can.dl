@@ -13,7 +13,7 @@ conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
 
 
 async def addgroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles:
+    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
         await bot.send_typing(ctx.message.channel)
         roles = list(ctx.message.server.roles)
         s = ""
@@ -33,7 +33,7 @@ async def addgroup(ctx, x):
         else:
             try:
                 nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">>",ctx.message.author,"created new group(s):")
+                print(">> {} created new group(s):".format(ctx.message.author))
 
                 # Using index numbers, we'll save information on selected roles to our database
                 conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
@@ -49,9 +49,9 @@ async def addgroup(ctx, x):
                     if not c.fetchone(): # If it doesn't exist, insert the group info as a new row
                         c.execute('INSERT INTO active_groups VALUES (?,?,?,?)', role_data)
                         conn.commit()
-                        print("  ",roles[n])
+                        print("  {}".format(roles[n]))
                     else:
-                        print("  ",roles[n].name,"[ALREADY EXISTS]")
+                        print("  {} [ALREADY EXISTS]".format(roles[n].name))
 
                 await bot.send_message(ctx.message.channel,"🗒️ | **Selected roles have been successfully added as groups! Type **`c|group list`** to view these roles that users can give themselves.**")
                 conn.close()
@@ -64,10 +64,10 @@ async def addgroup(ctx, x):
                 await bot.delete_message(rolelist)
 
     else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" permission in order to use this command!**")
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
 
 async def removegroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles:
+    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
         conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
         c = conn.cursor()
 
@@ -79,7 +79,7 @@ async def removegroup(ctx, x):
         # Gather all the available role IDs into the list above
         for row in c.execute('SELECT role_id FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
             grouplist.append(int(str(row)[1:-2])) # 'row' variable shows up as '()' if not converted to a string first.
-        print(">>",grouplist)
+        print(">> {}".format(grouplist))
 
         # Compile the list of role names
         for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
@@ -100,13 +100,13 @@ async def removegroup(ctx, x):
         else:
             try:
                 nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">>",ctx.message.author,"removed groups:")
+                print(">> {} removed groups:".format(ctx.message.author))
 
                 for n in nums: # Deletes one row at a time
                     await bot.send_typing(ctx.message.channel)
                     c.execute('DELETE FROM active_groups WHERE role_id=?', (grouplist[n],))
                     conn.commit()
-                    print("  ",discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])),"|",grouplist[n])
+                    print("  {} | {}".format(discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])),grouplist[n]))
 
                 await bot.send_message(ctx.message.channel,"🗒️ | **Selected groups have successfully been removed! Type **`c|group list`** to view these roles that users can give themselves.**")
 
@@ -119,7 +119,7 @@ async def removegroup(ctx, x):
                 conn.close()
 
     else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" permission in order to use this command!**")
+        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
 
 async def joingroup(ctx, x):
     botperms = ctx.message.channel.permissions_for(ctx.message.server.me)
@@ -156,12 +156,12 @@ async def joingroup(ctx, x):
         else:
             try:
                 nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">>",ctx.message.author,"joined the following groups:")
+                print(">> {} joined the following groups:".format(ctx.message.author))
 
                 for n in nums:
                     grouprole = discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])) # Finding the role by ID
                     await bot.add_roles(ctx.message.author, grouprole)
-                    print("  ",grouprole)
+                    print("  {}".format(grouprole))
 
                 await bot.send_message(ctx.message.channel,"🗒️ | **Successfully joined group(s)!**")
 
@@ -210,12 +210,12 @@ async def leavegroup(ctx, x):
         else:
             try:
                 nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">>",ctx.message.author,"left the following groups:")
+                print(">> {} left the following groups:".format(ctx.message.author))
 
                 for n in nums:
                     grouprole = discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])) # Finding the role by ID
                     await bot.remove_roles(ctx.message.author, grouprole)
-                    print("  ",grouprole)
+                    print("  {}".format(grouprole))
 
                 await bot.send_message(ctx.message.channel,"🗒️ | **Successfully left group(s)!**")
 
@@ -235,13 +235,13 @@ async def listgroups(ctx, x):
     s = ""
     i = 1
 
-    print(">>",ctx.message.author,"listed the groups!")
+    print(">> {} listed the groups!".format(ctx.message.author))
     for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
         role = str(row)[2:-3] # Strips the parenthesis and comma from the result
 
         s += str(i) + ": " + role + "\n"
         i += 1
-        print("  ",role)
+        print("  {}".format(role))
 
     await bot.send_typing(ctx.message.channel)
     await bot.send_message(ctx.message.channel,"🗒️ | **Roles that users can gives themselves (groups) are as follows:**\n```{}```".format(s))
@@ -294,11 +294,11 @@ async def group(error, ctx):
 async def help(ctx):
     helpmsg = discord.Embed(color=0xe0216a, url=" ", description="All commands must start with **c|** (e.g. *c|help*).")
 
-    helpmsg.set_author(name="🕯️ Can.dl Commands")
+    helpmsg.set_author(name="🕯️ "+bot.user.name+" Commands")
     helpmsg.set_footer(text="[Page 1 of 1]")
 
     helpmsg.add_field(name="Default:", value="`group` - Provides options for roles that a user can assign themselves without the need of a 'Manage Roles' permission (i.e. voluntary roles like colors and whatnot). Available roles can be configured by an admin. \n`help` - Pulls up this message. \n`ping` - Responds with 'pong!', used to check response time of the bot. \n`someone` - mentions a random user with the included message. \ne.g. *\"c|someone hello there!\"* \n   ")
-    helpmsg.add_field(name="Fun:", value="`trope` - Returns a random TV Tropes page.\n`stack` - Searches StackOverflow with the provided input.\n   ")
+    helpmsg.add_field(name="Fun:", value="`markov` - Randomly generates a markov chain from messages in the chat.\n`trope` - Returns a random TV Tropes page.\n`stack` - Searches StackOverflow with the provided input.\n   ")
     helpmsg.add_field(name="Utility:", value="`countdown` - Starts a countdown timer that the bot updates in real time. Restricted to one countdown at a time since it's a little finnicky. \ne.g. *\"c|countdown title 01:30:05 #23272A -m\"* (including `-m` makes it mention everyone once finished)\n`invite` - Creates a fancy embedded invite card for people to react to as a way to RSVP for an upcoming event. For syntax information, trigger the command without any arguments (i.e. just type \"c|invite\").\n    ")
     helpmsg.add_field(name="Admin:", value="`cherrypick` - Purges a given number of messages that meet the provided criteria, which can be either a user or keyword.\ne.g *\"c|cherrypick lasagna 25\"* (the number is how many messages to ***check*** the keyword for, not how many you want to delete) \n`napalm` - Purges 1975 messages in the channel with a fiery napalm. Prompts with a warning before use. \n    ")
 
@@ -315,6 +315,7 @@ async def ping(ctx):
 
 
 @bot.command(pass_context=True)
+@commands.cooldown(1,8, commands.BucketType.channel)
 async def someone(ctx):
     channel = ctx.message.channel
     users = list(ctx.message.server.members) # Grabs a dictionary of users on the server, then converts it to a list
@@ -322,3 +323,11 @@ async def someone(ctx):
 
     await bot.send_message(channel,'{}{}'.format(random.choice(users).mention, msg))
     # The {} gets replaced by the contents of the format function in their corresponding order
+
+@someone.error
+async def someone(error,ctx):
+    print(">> Failed c|someone: {}".format(error))
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    elif isinstance(error, commands.CheckFailure):
+        pass
