@@ -82,7 +82,7 @@ async def markovchannel(message, target_channel):
 async def markov(ctx, user=None, chan=None):
     """ Generates a Markov Chain from recent messages."""
 
-    print(">>",ctx.message.author,"requested a markov chain, processing...") # log command usage
+    print(">> {} requested a markov chain, processing...".format(ctx.message.author)) # log command usage
 
     # Convert channel to an object we can work with
     if chan: # sets default channel if one isn't provided
@@ -132,9 +132,11 @@ async def markov(ctx, user=None, chan=None):
 
 @markov.error
 async def markov(error,ctx):
-    print(">>",ctx.message.author,"attempted to run markov, but failed:",error)
+    print(">> {} attempted to run c|markov, but failed: {}".format(ctx.message.author,error))
     if isinstance(error, commands.CommandOnCooldown):
         await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    elif isinstance(error, commands.CheckFailure):
+        pass
     else:
         await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user #channel` **(user and channel optional)**")
 
@@ -158,7 +160,7 @@ async def stack(ctx, *,args):
 
 @stack.error
 async def stack(error,ctx):
-    print(error)
+    print(">> c|stack: {}".format(error))
     await bot.send_message(ctx.message.channel,"❌ | **Please enter a valid search query!**")
 
 

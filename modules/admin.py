@@ -31,7 +31,7 @@ async def cherrypick(ctx, keyword, amount=10):
             status = await bot.send_message(ctx.message.channel, "🍒 | **{} messages have been successfully deleted.**".format(len(deleted)))
 
             mentionee = str(ctx.message.mentions[0]) + "'s" # commas in the print function add spaces by default, this bypasses that.
-            print(">>",ctx.message.author,"deleted",len(deleted),"of",mentionee,"messages.")
+            print(">> {} deleted {} of {} messages.".format(ctx.message.author,len(deleted),mentionee))
 
             await asyncio.sleep(5)
             await bot.delete_message(status)
@@ -46,7 +46,7 @@ async def cherrypick(ctx, keyword, amount=10):
             await bot.delete_message(ctx.message)
             deleted = await bot.purge_from(ctx.message.channel, limit=amount, check=key)
             status = await bot.send_message(ctx.message.channel, "🍒 | **{} messages have been successfully deleted.**".format(len(deleted)))
-            print(">>",ctx.message.author,"deleted",len(deleted),"messages containing the keyword:",keyword)
+            print(">> {} deleted {} messages containing the keyword: \'{}\'".format(ctx.message.author,len(deleted),keyword))
 
             await asyncio.sleep(5)
             await bot.delete_message(status)
@@ -76,7 +76,7 @@ async def execfn(ctx, fn):
     # Split each new line into seperate strings, add indentation, then join them back together.
     cmd = fn.strip("`")
     inp = "\n".join(f"    {i}" for i in cmd.splitlines())
-    print(">>> EVAL:",inp)
+    print(">>> EVAL: {}".format(inp))
 
     # Now we need to wrap our code in an async function
     body = (f"async def {fn_name}():\n" + inp)
@@ -117,11 +117,11 @@ async def evalfn(ctx, *, arg):
 
         try: # we're gonna see if eval() can run without a problem, otherwise use exec()
             await bot.send_message(ctx.message.channel, "```python\n>>> {} \n{}```".format(msg, eval(arg)))
-            print(">> EVAL:",msg)
+            print(">> EVAL: {}".format(msg))
         except SyntaxError:
             await execfn(ctx, arg)
     else:
-        print(">>",ctx.message.author,"attempted to use eval command, but failed.")
+        print(">> {} attempted to use eval command, but failed.".format(ctx.message.author))
 
 @evalfn.error
 async def evalfn_on_error(error, ctx):
@@ -148,7 +148,7 @@ async def napalm(ctx):
 
             # Confirmation 2
             if msg2.clean_content == "FortunateSon55":
-                print ('>>',ctx.message.author,'activated command: \"c|napalm\"')
+                print (">> {} activated c|napalm".format(ctx.message.author))
                 await bot.send_message(channel, "💣 | **Firing the napalms...**")
 
                 # Fire ahoy
@@ -197,4 +197,4 @@ async def shutdown(ctx):
 
         await bot.close()
     else:
-        print(">>",ctx.message.author,"attempted to shut the bot down, but failed.")
+        print(">> {} attempted to shut the bot down, but failed.".format(ctx.message.author))

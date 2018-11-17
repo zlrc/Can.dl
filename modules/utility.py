@@ -14,7 +14,7 @@ async def update_ctdwn(ctx,msg,title,hh,mm,ss,color,mention):
     m = int(mm)
     s = int(ss)
     i = s+(60*m)+(60*60*h) # Total time left in seconds.
-    print(">>",ctx.message.author,"created a timer for:",i,"seconds.")
+    print(">> {} created a timer for {} seconds".format(ctx.message.author,i))
 
     if os.path.isfile("countdown_cache.py"): # Checks if a cache file exists
         while i >= 0 and os.path.isfile("countdown_cache.py"): # As long as we have time remaining and the message hasn't been deleted.
@@ -79,7 +79,7 @@ async def countdown(ctx, title, time=None, hexcode="#23272A", m=None):
                 await bot.delete_message(ctx.message)
 
                 await bot.send_message(ctx.message.channel,"⏲️ | **The countdown has been canceled!**")
-                print(">>",ctx.message.author,"canceled the timer.")
+                print(">> {} canceled the timer".format(ctx.message.author))
                 os.remove("countdown_cache.py")
             else:
                 await bot.send_message(channel,"❌ | **That isn't your timer! Please ask the creator of that timer or an admin to cancel it for you.**")
@@ -132,7 +132,7 @@ async def invite(ctx, title, desc, limit=None, img_url=None, hexcode="#23272A"):
     - Cancel/Close the invite
     """
 
-    print(">> Creating an invite card for",ctx.message.author,":",title)
+    print(">> Creating an invite card for {}: {}".format(ctx.message.author,title))
     color = '0x' + hexcode.strip('#') # Converts the hexcode to a format that our code can read (0x23272A)
 
     # Setting default image if one is requested
