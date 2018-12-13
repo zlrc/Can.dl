@@ -28,7 +28,8 @@ The code for this bot runs on Python 3. You should be allowed to use the code fr
 - Python 3
 - [discord.py](https://github.com/rapptz/discord.py)
 - [Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/#Download)
-- [markovify](https://github.com/jsvine/markovify)
+- [Markovify](https://github.com/jsvine/markovify)
+- [Pillow](https://pillow.readthedocs.io/en/stable/installation.html)
 
 <i style="font-size: 10.5pt; color: rgb(200,0,0)">* Please let me know if there are any other dependencies that I need to include.</i>
 

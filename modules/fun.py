@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from builtins import bot
+from math import floor
 import asyncio
 import aiohttp
 from io import BytesIO
@@ -9,8 +10,51 @@ import re
 import requests
 import random
 from bs4 import BeautifulSoup
+from PIL import Image
 import markovify
+import os
 
+
+def add_overlay(source_img, overlay_path, top_left=None, bottom_right=None):
+    """Adds given overlay to provided base image, returns as bytes object"""
+    script_dir = os.path.dirname(__file__) # absolute path of fun.py
+    rel_path = overlay_path # relative path of the overlay image
+    abs_file_path = os.path.join(script_dir, rel_path) # absolute path of overlay image
+
+    overlay = Image.open(abs_file_path).convert("RGBA") # overlay image
+    source = Image.open(source_img).convert("RGBA") # base image before editing
+    o_width, o_height = overlay.size # stores width and height of overlay image
+    s_width, s_height = source.size # stores width and height of source
+
+    if top_left and bottom_right: # if coordinates for a frame is given
+        f_width = bottom_right[0] - top_left[0] # specified frame width
+        f_height = bottom_right[1] - top_left[1] # specified frame height
+
+        n_height = int(floor(s_height*(f_width/s_width))) # calculate height of base image
+        if n_height < f_height:
+            n_height = f_height
+
+        base = source.resize( (f_width, n_height) ) # resize to width of frame
+        bg = Image.new("RGBA", (o_width, o_height), (255, 255, 255))
+        bg.paste(base,top_left,base)
+        bg.paste(overlay,(0,0),overlay)
+        base_final = bg.crop((0,0,o_width,o_height)) # crop to overlay
+    else:
+        n_height = int(floor(s_height*(o_width/s_width))) # calculate height of base image
+        if n_height < o_height:
+            n_height = o_height
+
+        base = source.resize( (o_width, n_height) ) # resizes to width of overlay
+        base.paste(overlay,(0,0),overlay) # pastes overlay onto the base image
+        base_final = base.crop((0,0,o_width,o_height)) # crop to overlay
+
+    overlay.close()
+    source.close()
+
+    with BytesIO() as buffer:
+        base_final.save(buffer,"PNG") # saves generated image to buffer
+        base_final.close()
+        return BytesIO(buffer.getvalue())
 
 def convert_to_url(url):
 
@@ -21,6 +65,22 @@ def convert_to_url(url):
     url = re.sub(r"\s+", '+', url)
 
     return url
+
+async def get_img(ctx):
+    """Returns the most recent attachment posted to the channel"""
+
+    log = bot.logs_from(ctx.message.channel, 50) # check last 50 messages
+    async for i in log:
+        if i.attachments: # if the message has an attachment
+            async with aiohttp.get(i.attachments[0]['url']) as r: # get attachment url
+                if r.status == 200:
+                    return BytesIO(await r.read())
+
+def abs_path(path):
+    """Returns absolute path of file given"""
+    script_dir = os.path.dirname(__file__) # absolute path of fun.py
+    rel_path = path # relative path
+    return os.path.join(script_dir, rel_path) # absolute path of file
 
 
 
@@ -178,3 +238,83 @@ async def trope(ctx, *,args=None):
         # Opens up a random page through a special url, saves it as the variable: "url"
         async with aiohttp.get("http://tvtropes.org/pmwiki/randomitem.php?p="+str(random.randint(1,9999999999))) as url:
             await bot.send_message(ctx.message.channel, "{}".format(url.url))
+
+
+
+## Overlay Commands
+@bot.command(pass_context=True)
+async def pequod(ctx):
+    """
+    Adds the motherbase.png overlay to the most recent image posted
+    (this command is hidden from the help menu)
+    """
+    file = add_overlay(await get_img(ctx),"../db/images/overlays/motherbase.png")
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_file(ctx.message.channel, fp=file, filename="pequod.png")
+
+@bot.command(pass_context=True)
+@commands.cooldown(1,5, commands.BucketType.channel)
+async def snake(ctx):
+    """snake-binoculars.png"""
+    file = add_overlay(await get_img(ctx),"../db/images/overlays/snake-binoculars.png",(0,281),(499, 560))
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_file(ctx.message.channel, fp=file, filename="snake.png")
+
+@bot.command(pass_context=True)
+async def mariod(ctx):
+    """mario-odyssey.png"""
+    file = add_overlay(await get_img(ctx),"../db/images/overlays/mario-odyssey.png")
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_file(ctx.message.channel, fp=file, filename="mariod.png")
+
+@bot.command(pass_context=True)
+@commands.cooldown(1,5, commands.BucketType.channel)
+async def kojima(ctx):
+    """therealfinaldestination.png"""
+    file = add_overlay(await get_img(ctx),"../db/images/overlays/kojima1.png",(47,249),(176, 412))
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_file(ctx.message.channel, fp=file, filename="kojima.png")
+
+@bot.command(pass_context=True)
+async def jared(ctx):
+    """jared.png"""
+    file = add_overlay(await get_img(ctx),"../db/images/overlays/jared.png")
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_file(ctx.message.channel, fp=file, filename="jared.png")
+
+@bot.command(pass_context=True)
+@commands.cooldown(1,5, commands.BucketType.channel)
+async def flag(ctx):
+    """tumblr flag overlay"""
+    top_left = Image.open(abs_path("../db/images/overlays/flag1.png")).convert("RGBA") # "Your post has been flagged"
+    top_right = Image.open(abs_path("../db/images/overlays/flag2.png")).convert("RGBA") # "Review"
+    source = Image.open(await get_img(ctx)).convert("RGBA") # base image before editing
+    banner = Image.new("RGBA", (source.size[0], 50), (252, 75, 57))
+
+    source.paste(banner,(0,0),banner)
+    source.paste(top_left,(0,0),top_left)
+    source.paste(top_right,(source.size[0]-top_right.size[0],0),top_right)
+    banner.close()
+    top_left.close()
+    top_right.close()
+
+    with BytesIO() as buffer:
+        source.save(buffer,"PNG") # saves generated image to buffer
+        source.close()
+        img = BytesIO(buffer.getvalue())
+
+        await bot.send_typing(ctx.message.channel)
+        await bot.send_file(ctx.message.channel, fp=img, filename="flag.png")
+
+@kojima.error
+@mariod.error
+@pequod.error
+@jared.error
+@flag.error
+@snake.error
+async def overlay_error(error,ctx):
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+    else:
+        print(">> overlay command error: {}".format(error))
+        await bot.send_message(ctx.message.channel,"🔍 | **Couldn't find image!**")
