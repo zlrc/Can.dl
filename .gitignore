@@ -110,5 +110,7 @@ pip-selfcheck.json
 config.json
 discord.log
 dbcompile.py
+overlay.py
+db/images/overlays/
 *.db
 *.desktop
