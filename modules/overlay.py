@@ -1,4 +1,4 @@
-# Overlay commands. There's a lot of them, so they're part of their own module
+# Overlay commands. There can be a lot of them, so they're part of their own module
 import discord
 from discord.ext import commands
 from builtins import bot
@@ -10,23 +10,33 @@ from PIL import Image
 import os
 from modules.fun import convert_to_url, get_img, abs_path
 
-overlay_list = ["pequod",
-                "snake",
-                "mariod",
-                "makarov",
-                "kojima",
-                "jared",
-                "thereiam",
-                "sonic",
-                "sm64",
-                "trogun",
-                "flag"]
+overlay_list = ["thereiam",
+                #"fake_entry",
+                ""]
 
 
 def add_overlay(source_img, overlay_path, top_left=None, bottom_right=None):
-    """Adds given overlay to provided base image, returns as bytes object"""
+    """
+    Adds given overlay to provided base image.
 
-    script_dir = os.path.dirname(__file__) # absolute path of fun.py
+    Parameters
+    ----------
+    source_img : BytesIO
+        bytes object containing base image to put the overlay on, obtained through get_img(ctx)
+    overlay_path : str
+        relative filepath of overlay image
+    top_left : (int, int), optional
+        coordinates for the top-left corner of the frame source_img appears in
+    bottom_right : (int, int), optional
+        coordinates for the bottom-right corner of the frame source_img appears in
+
+    Returns
+    -------
+    BytesIO
+        a bytes object containing the resulting image.
+    """
+
+    script_dir = os.path.dirname(__file__) # absolute path of this .py file
     rel_path = overlay_path # relative path of the overlay image
     abs_file_path = os.path.join(script_dir, rel_path) # absolute path of overlay image
 
@@ -53,9 +63,10 @@ def add_overlay(source_img, overlay_path, top_left=None, bottom_right=None):
         if n_height < o_height:
             n_height = o_height
 
+        y_offset = int(floor((n_height - o_height)/2)) # top-left corner's y-coordinate, for centering on the y-axis
         base = source.resize( (o_width, n_height) ) # resizes to width of overlay
-        base.paste(overlay,(0,0),overlay) # pastes overlay onto the base image
-        base_final = base.crop((0,0,o_width,o_height)) # crop to overlay
+        base.paste(overlay,(0,y_offset),overlay) # pastes overlay onto the base image
+        base_final = base.crop((0,y_offset,o_width,o_height+y_offset)) # crop to overlay
 
     overlay.close()
     source.close()
@@ -69,117 +80,16 @@ def add_overlay(source_img, overlay_path, top_left=None, bottom_right=None):
 
 ## Individual functions for each command
 @bot.command(pass_context=True)
-async def pequod(ctx):
-    """motherbase.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/motherbase.png")
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="pequod.png")
-
-@bot.command(pass_context=True)
-@commands.cooldown(1,5, commands.BucketType.channel)
-async def snake(ctx):
-    """snake-binoculars.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/snake-binoculars.png",(0,281),(499, 560))
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="snake.png")
-
-@bot.command(pass_context=True)
-async def mariod(ctx):
-    """mario-odyssey.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/mario-odyssey.png")
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="mariod.png")
-
-@bot.command(pass_context=True)
-@commands.cooldown(1,5, commands.BucketType.channel)
-async def makarov(ctx):
-    """makarov.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/makarov.png",(15,34),(396, 312))
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="makarov.png")
-
-@bot.command(pass_context=True)
-@commands.cooldown(1,5, commands.BucketType.channel)
-async def kojima(ctx):
-    """kojima1.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/kojima1.png",(47,249),(176, 412))
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="kojima.png")
-
-@bot.command(pass_context=True)
-async def jared(ctx):
-    """jared.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/jared.png")
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="jared.png")
-
-@bot.command(pass_context=True)
 async def thereiam(ctx):
     """spongehand.png"""
     file = add_overlay(await get_img(ctx),"../db/images/overlays/spongehand.png")
     await bot.send_typing(ctx.message.channel)
     await bot.send_file(ctx.message.channel, fp=file, filename="thereiam.png")
 
-@bot.command(pass_context=True)
-async def sonic(ctx):
-    """sonic.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/sonic.png")
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="sonic.png")
-
-@bot.command(pass_context=True)
-@commands.cooldown(1,5, commands.BucketType.channel)
-async def sm64(ctx):
-    """SuperMario64.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/SuperMario64.png",(157,31),(483, 377))
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="sm64.png")
-
-@bot.command(pass_context=True)
-async def trogun(ctx):
-    """troggun.png"""
-    file = add_overlay(await get_img(ctx),"../db/images/overlays/troggun.png")
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_file(ctx.message.channel, fp=file, filename="trogun.png")
-
-@bot.command(pass_context=True)
-@commands.cooldown(1,5, commands.BucketType.channel)
-async def flag(ctx):
-    """tumblr flag overlay"""
-    top_left = Image.open(abs_path("../db/images/overlays/flag1.png")).convert("RGBA") # "Your post has been flagged"
-    top_right = Image.open(abs_path("../db/images/overlays/flag2.png")).convert("RGBA") # "Review"
-    source = Image.open(await get_img(ctx)).convert("RGBA") # base image before editing
-    banner = Image.new("RGBA", (source.size[0], 50), (252, 75, 57))
-
-    source.paste(banner,(0,0),banner)
-    source.paste(top_left,(0,0),top_left)
-    source.paste(top_right,(source.size[0]-top_right.size[0],0),top_right)
-    banner.close()
-    top_left.close()
-    top_right.close()
-
-    with BytesIO() as buffer:
-        source.save(buffer,"PNG") # saves generated image to buffer
-        source.close()
-        img = BytesIO(buffer.getvalue())
-
-        await bot.send_typing(ctx.message.channel)
-        await bot.send_file(ctx.message.channel, fp=img, filename="flag.png")
-
 
 
 ## Error Handler(s)
-@pequod.error
-@snake.error
-@mariod.error
-@makarov.error
-@kojima.error
-@jared.error
 @thereiam.error
-@sonic.error
-@sm64.error
-@trogun.error
-@flag.error
 async def overlay_error(error,ctx):
     if isinstance(error, commands.CommandOnCooldown):
         await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
