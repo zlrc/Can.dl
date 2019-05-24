@@ -111,6 +111,7 @@ config.json
 discord.log
 dbcompile.py
 overlay.py
+db/madlibs/*.txt
 db/images/overlays/
 *.db
 *.desktop

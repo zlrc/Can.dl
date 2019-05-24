@@ -53,6 +53,59 @@ def abs_path(path):
 
 
 
+## Mad Libs
+def get_lib_template():
+    """Returns a random lib from the db/madlibs folder"""
+    rand_file = "db/madlibs/" + random.choice(os.listdir("db/madlibs"))
+    with open(rand_file,"r") as file:
+        # Returns the title of the lib, number of blanks, and the story itself.
+        title = file.readline().strip('\n')
+        blanks = file.readline().strip('\n')
+        text = file.readline()
+        return title, blanks, text
+
+async def get_lib_input(channel, wclass, index, total):
+    """Asks users for the given word class and returns the first response it gets"""
+    await bot.send_message(channel,"📜 | **[{}/{}] Please give me a** ***{}***".format(index, total, wclass))
+
+    def is_valid(m):
+        return ((m.author != bot.user) and (not m.attachments))
+
+    input = await bot.wait_for_message(channel=channel, check=is_valid)
+    return input.clean_content # .partition(' ')[0] to grab the first word only
+
+@bot.command(pass_context=True)
+@commands.cooldown(1,45, commands.BucketType.channel)
+async def madlib(ctx):
+    await bot.send_message(ctx.message.channel,"```A lib has started!\nType \"> CANCEL\" to stop.```")
+    title, total_blanks, template_string = get_lib_template()
+    new_string = ""
+    progress = 0
+
+    # Loop through each word, replace the ones with spoiler tags
+    for index, word in enumerate(template_string.split('_')):
+        if (word[0:2] == '||'): # if the word has spoiler tags
+            progress += 1
+            input_string = await get_lib_input(ctx.message.channel, word.strip('|'), progress, total_blanks)
+
+            if (input_string == '> CANCEL'):
+                await bot.send_message(ctx.message.channel,"📜 | **Canceled! Here is what you had up to this point:**")
+                break
+
+            new_string += "||" + input_string + "||"
+        else:
+            new_string += word
+
+    await bot.send_message(ctx.message.channel,"```{}```{}```-- END --```".format(title,new_string))
+
+@madlib.error
+async def madlib(error,ctx):
+    print(">> {} attempted to run c|madlib, but failed: {}".format(ctx.message.author,error))
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+
+
+
 ## Markov Chains
 def tomarkov(string):
     """Returns a randomly generated sentence from the string provided"""
