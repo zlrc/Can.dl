@@ -19,31 +19,21 @@ A personal, niche-purpose bot with features intended to fit specific needs of sm
 <p align="center"><img src="https://imgur.com/SbJ4Rwy.png"></p>
 
 ## How to Invite
-Can.dl is a little bot with little power. Since the machine that it's hosted on isn't all that powerful, the bot is currently limited to private access. What this means for you is that you gotta ask politely for me to invite the bot to your server. Otherwise, you're free to use the source code provided here to set up your own bot, granted that you know how to do that.
+Can.dl is a little bot with little power. Since the machine that it's hosted on isn't all that powerful, the bot is currently limited to private access. You're free to use the source code provided here to set up your own bot though, granted that you know how to do that.
 
 ## Hosting your own Bot
 The code for this bot runs on Python 3. You should be allowed to use the code freely under the license that's included for your own bot. For in-depth help on how to actually make a discord bot, I'd suggest looking up [online tutorials](https://medium.com/@moomooptas/how-to-make-a-simple-discord-bot-in-python-40ed991468b4) and the [discord.py documentation](https://discordpy.readthedocs.io/en/latest/api.html) rather than here.
+
+Once you're all set up, run `run.py` to boot up the bot.
 
 ### Dependencies:
 - Python 3
 - [discord.py](https://github.com/rapptz/discord.py)
 - [Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/#Download)
-- [markovify](https://github.com/jsvine/markovify)
+- [Markovify](https://github.com/jsvine/markovify)
+- [Pillow](https://pillow.readthedocs.io/en/stable/installation.html)
 
 <i style="font-size: 10.5pt; color: rgb(200,0,0)">* Please let me know if there are any other dependencies that I need to include.</i>
-
-**For Linux users -** I would suggest creating a .desktop launcher with something like the following code to make it easier to launch the bot at the click of a mouse button:
-
-    [Desktop Entry]
-    Version=1.0
-    Type=Application
-    Name=Run Bot
-    Comment=
-    Exec=python3 run.py
-    Icon=discord
-    Path=/home/filepath/of/the/bot
-    Terminal=true
-    StartupNotify=false
 
 [groups]: https://imgur.com/NyXfOPq.png
 [invite]: https://imgur.com/bLVCJet.png

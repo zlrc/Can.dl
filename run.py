@@ -4,6 +4,9 @@ from discord.ext import commands
 import builtins
 import os
 import json
+import sqlite3
+from sqlite3 import Error
+import datetime
 
 client = discord.Client()
 bot = commands.Bot(command_prefix='c|')
@@ -52,6 +55,37 @@ import modules.main
 import modules.admin
 import modules.utility
 import modules.fun
+import modules.overlay
+import modules.private
+
+
+
+## Setting up database for tracking usage frequency
+usage_db = sqlite3.connect(os.path.realpath('db/bot_usage.db'))
+
+try: # set up a table if one doesn't exist already
+    c = usage_db.cursor()
+    c.execute('''CREATE TABLE usage_data
+             (month integer, day integer, hour integer, minute integer, weekday text)''')
+    usage_db.commit()
+    print(">> No usage data table found, generating a new one...")
+except:
+    pass
+
+def record_invoke():
+    """Records current date and time to database"""
+    current = datetime.datetime.now()
+    weekday = datetime.datetime.today().weekday()
+    w = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    data = (current.month, current.day, current.hour, current.minute, w[weekday])
+
+    usage_db = sqlite3.connect(os.path.realpath('db/bot_usage.db'))
+    c = usage_db.cursor()
+
+    c.execute('INSERT INTO usage_data VALUES (?,?,?,?,?)', data)
+    usage_db.commit()
+    usage_db.close()
+    #print(data)
 
 
 
@@ -72,6 +106,11 @@ async def on_ready():
         def debug_owner_check(ctx):
             """Prevents everyone but the bot owner from executing commands while debug mode is enabled"""
             return ctx.message.author.id == ownerID
+    else:
+        @bot.check
+        def usage_counter(ctx):
+            record_invoke()
+            return True
 
 
 bot.run(TOKEN)

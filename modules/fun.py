@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from builtins import bot
+from math import floor
 import asyncio
 import aiohttp
 from io import BytesIO
@@ -9,7 +10,9 @@ import re
 import requests
 import random
 from bs4 import BeautifulSoup
+from PIL import Image
 import markovify
+import os
 
 
 def convert_to_url(url):
@@ -21,6 +24,85 @@ def convert_to_url(url):
     url = re.sub(r"\s+", '+', url)
 
     return url
+
+async def get_img(ctx):
+    """Returns the most recent attachment posted to the channel"""
+
+    # regex to check if there is an image url within the message
+    url_regex = r'(\b(?:(?:https?)|(?:ftp)|(?:file)):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*(?:(?:\.jpg)|(?:\.jpeg)|(?:\.png)|(?:\.gif)))'
+
+    log = bot.logs_from(ctx.message.channel, 50) # check last 50 messages
+    async for i in log:
+        if i.attachments: # if the message has an attachment
+            url = i.attachments[0]['url'] # attachment url
+        elif re.search(url_regex,i.clean_content,flags=re.IGNORECASE): # look for url using regex
+            url = re.search(url_regex,i.clean_content,flags=re.IGNORECASE).group(0)
+
+        try:
+            async with aiohttp.get(url) as r: # access the url
+                if r.status == 200:
+                    return BytesIO(await r.read())
+        except:
+            pass
+
+def abs_path(path):
+    """Returns absolute path of file given"""
+    script_dir = os.path.dirname(__file__) # absolute path of fun.py
+    rel_path = path # relative path
+    return os.path.join(script_dir, rel_path) # absolute path of file
+
+
+
+## Mad Libs
+def get_lib_template():
+    """Returns a random lib from the db/madlibs folder"""
+    rand_file = "db/madlibs/" + random.choice(os.listdir("db/madlibs"))
+    with open(rand_file,"r") as file:
+        # Returns the title of the lib, number of blanks, and the story itself.
+        title = file.readline().strip('\n')
+        blanks = file.readline().strip('\n')
+        text = file.readline()
+        return title, blanks, text
+
+async def get_lib_input(channel, wclass, index, total):
+    """Asks users for the given word class and returns the first response it gets"""
+    await bot.send_message(channel,"📜 | **[{}/{}] Please give me a** ***{}***".format(index, total, wclass))
+
+    def is_valid(m):
+        return ((m.author != bot.user) and (not m.attachments))
+
+    input = await bot.wait_for_message(channel=channel, check=is_valid)
+    return input.clean_content # .partition(' ')[0] to grab the first word only
+
+@bot.command(pass_context=True)
+@commands.cooldown(1,45, commands.BucketType.channel)
+async def madlib(ctx):
+    await bot.send_message(ctx.message.channel,"```A lib has started!\nType \"> CANCEL\" to stop.```")
+    title, total_blanks, template_string = get_lib_template()
+    new_string = ""
+    progress = 0
+
+    # Loop through each word, replace the ones with spoiler tags
+    for index, word in enumerate(template_string.split('_')):
+        if (word[0:2] == '||'): # if the word has spoiler tags
+            progress += 1
+            input_string = await get_lib_input(ctx.message.channel, word.strip('|'), progress, total_blanks)
+
+            if (input_string == '> CANCEL'):
+                await bot.send_message(ctx.message.channel,"📜 | **Canceled! Here is what you had up to this point:**")
+                break
+
+            new_string += "||" + input_string + "||"
+        else:
+            new_string += word
+
+    await bot.send_message(ctx.message.channel,"```{}```{}```-- END --```".format(title,new_string))
+
+@madlib.error
+async def madlib(error,ctx):
+    print(">> {} attempted to run c|madlib, but failed: {}".format(ctx.message.author,error))
+    if isinstance(error, commands.CommandOnCooldown):
+        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
 
 
 
@@ -55,8 +137,25 @@ async def markovuser(message, member, target_channel):
         if (i.author.id == member.id) and (not "c|" in i.clean_content):
             string += i.clean_content + "\n"
 
+    # Generate chain from messages, keep trying if there's an error
+    msg = tomarkov(string)
+    attempts = 1
+    while ("❌ |" in msg) and (attempts <= 5):
+        print("    >> Failed, trying again... ({}/5)".format(attempts) )
+        await bot.send_typing(message.channel)
+        log = bot.logs_from(target_channel, 5000+(1000*attempts))
+        #start = 5000 + ( 1000*(attempts-1) )
+
+        string = ""
+        async for i in log:
+            if (i.author.id == member.id) and (not "c|" in i.clean_content):
+                string += i.clean_content + "\n"
+        msg = tomarkov(string)
+        attempts += 1
+
+
     # Create an embed to simulate a user quote
-    embed = discord.Embed(color=member.color, description=tomarkov(string))
+    embed = discord.Embed(color=member.color, description=msg)
     embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
 
     # Send results
@@ -178,3 +277,19 @@ async def trope(ctx, *,args=None):
         # Opens up a random page through a special url, saves it as the variable: "url"
         async with aiohttp.get("http://tvtropes.org/pmwiki/randomitem.php?p="+str(random.randint(1,9999999999))) as url:
             await bot.send_message(ctx.message.channel, "{}".format(url.url))
+
+
+
+## Overlay Commands
+from modules.overlay import overlay_list
+
+@bot.command(pass_context=True)
+async def overlays(ctx):
+    m = "🗒️ | **Available Overlays:**\n```"
+
+    for i in overlay_list:
+        m += i + ", "
+
+    msg = m.rstrip(", ") + "```"
+    await bot.send_typing(ctx.message.channel)
+    await bot.send_message(ctx.message.channel,msg)
