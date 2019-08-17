@@ -107,10 +107,10 @@ pip-selfcheck.json
 
 # End of https://www.gitignore.io/api/python
 
-config.json
+#config.json
 discord.log
 dbcompile.py
-overlay.py
+#overlay.py
 db/madlibs/*.txt
 db/images/overlays/
 *.db
