@@ -1,333 +1,120 @@
-# Generic bot commands (mostly)
+# Maintenance Commands
 import discord
 from discord.ext import commands
-from builtins import bot
-import random
-import os.path
-import sqlite3
-from sqlite3 import Error
-bot.remove_command('help') # Removes existing help command so that I can replace it with a fancier one
+from wax.logger import log
+import ast
 
-# Setting up server groups database
-conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
+class Maintenance(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.hidden = True
 
-
-async def addgroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
-        await bot.send_typing(ctx.message.channel)
-        roles = list(ctx.message.server.roles)
-        s = ""
-
-        # Turning the list of roles into a working string, or else the bot just spits out the object ids
-        for i in roles[1:]:
-            s += str(roles.index(i)) + ": " + str(i) + "\n"
-        rolelist = await bot.send_message(ctx.message.channel,"```{}```\n🗒️ | **Type the number of the role you would like to make into a group, seperate numbers with a comma if converting multiple roles into groups. Otherwise, type **`cancel`** to quit.**".format(s))
-
-        msg = await bot.wait_for_message(author=ctx.message.author,channel=ctx.message.channel)
-
-        # Checks user response, then saves groups to database if valid.
-        if msg.clean_content.lower() == "cancel":
-            await bot.send_message(ctx.message.channel, "**Canceled!**")
-            await bot.delete_message(rolelist)
-            return
+    @commands.command(pass_context=True, hidden=True)
+    @commands.is_owner()
+    async def reload(self, ctx, *categories):
+        """ A command to reload Cogs / Modules """
+        if not categories:
+            await self.bot.send_message(ctx.message.channel,"❌ | **Syntax error, please list a module!**")
         else:
-            try:
-                nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">> {} created new group(s):".format(ctx.message.author))
+            success = "" # tracking successful reloads
+            for cog in categories:
+                try:
+                    self.bot.reload_cog(cog)
+                    success += "`" + cog + "` "
+                except commands.errors.ExtensionNotLoaded:
+                    log(">> Failed to reload cog: {}".format(cog), True, type="error")
 
-                # Using index numbers, we'll save information on selected roles to our database
-                conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
-                c = conn.cursor()
+            await self.bot.send_message(ctx.message.channel, "🔄 | **Reloaded the following modules: {}**".format(success))
 
-                for n in nums:
-                    await bot.send_typing(ctx.message.channel)
-                    role_data = (ctx.message.server.name, ctx.message.server.id, roles[n].name, roles[n].id)
+    @commands.command(pass_context=True, hidden=True)
+    @commands.is_owner()
+    async def refresh(self, ctx):
+        """ Reloads all of the loaded modules """
+        self.bot.refresh_cogs()
+        await self.bot.send_message(ctx.message.channel, "🔄 | **Modules have been refreshed.**")
 
-                    # Check if role has been added already
-                    c.execute('SELECT role_id FROM active_groups WHERE role_id=?', (roles[n].id,))
 
-                    if not c.fetchone(): # If it doesn't exist, insert the group info as a new row
-                        c.execute('INSERT INTO active_groups VALUES (?,?,?,?)', role_data)
-                        conn.commit()
-                        print("  {}".format(roles[n]))
-                    else:
-                        print("  {} [ALREADY EXISTS]".format(roles[n].name))
 
-                await bot.send_message(ctx.message.channel,"🗒️ | **Selected roles have been successfully added as groups! Type **`c|group list`** to view these roles that users can give themselves.**")
-                conn.close()
+    async def execfn(self, ctx, fn):
+        """
+        Intended to be used with c|evalfn.
 
-            except ValueError:
-                print(">> A group command was executed, but it failed...")
-                await bot.send_message(ctx.message.channel,"❌ | **Error! That is not a valid response!**")
+        If a code block is used with that command, it will run this function,
+        which will convert the code block into a python function we can actually
+        run and spit the results back out as a string.
+        """
 
-            finally:
-                await bot.delete_message(rolelist)
+        fn_name = "_eval_expr" # we're gonna recreate a function you normally see here, so it needs a name.
 
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
+        # Split each new line into seperate strings, add indentation, then join them back together.
+        cmd = fn.strip("`")
+        inp = "\n".join(f"    {i}" for i in cmd.splitlines())
+        print(">>> EVAL: {}".format(inp))
 
-async def removegroup(ctx, x):
-    if ctx.message.author.server_permissions.manage_roles and ctx.message.author.server_permissions.ban_members:
-        conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
-        c = conn.cursor()
+        # Now we need to wrap our code in an async function
+        body = (f"async def {fn_name}():\n" + inp)
 
-        s = ""
-        i = 1
+        parsed = ast.parse(body) # parsing the codeblock so that it's readable(?)
+        body = parsed.body[0].body
 
-        grouplist = [None]
+        # If we get an expression at the end (e.g. 'x+2'), then make it a return statement
+        if isinstance(body[-1], ast.Expr): # negative list index goes from the right instead of left
+            body[-1] = ast.Return(body[-1].value)
 
-        # Gather all the available role IDs into the list above
-        for row in c.execute('SELECT role_id FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            grouplist.append(int(str(row)[1:-2])) # 'row' variable shows up as '()' if not converted to a string first.
-        print(">> {}".format(grouplist))
+        ast.fix_missing_locations(body[-1])
 
-        # Compile the list of role names
-        for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            role = str(row)[2:-3] # Strips the parenthesis and comma from the result
+        # Need to re-declare variables that discord.py uses, since this is a fresh python script
+        env = {
+            'bot': ctx.bot,
+            'discord': discord,
+            'commands': commands,
+            'ctx': ctx,
+            'import': __import__
+        }
+        exec(compile(parsed, filename="<ast>", mode="exec"), env)
 
-            s += str(i) + ": " + role + "\n"
-            i += 1
+        await self.bot.send_typing(ctx.message.channel) # used to indicate the command went through
+        return (await eval(f"{fn_name}()", env))
 
-        await bot.send_typing(ctx.message.channel)
-        rolelist = await bot.send_message(ctx.message.channel,"```{}```\n🗒️ | **Type the number of the group you would like to remove, seperate numbers with a comma if removing more than one. Otherwise, type **`cancel`** to quit.**".format(s))
-        msg = await bot.wait_for_message(author=ctx.message.author,channel=ctx.message.channel)
+    @commands.command(pass_context=True, hidden=True)
+    @commands.is_owner()
+    async def evalfn(self, ctx, *, arg):
+        """
+        [Debug Command]
+        Runs python script directly from Discord
+        """
+        if ctx.message.author.id == self.bot.ownerID: # to be extra safe
+            msg = ctx.message.content.lstrip('c|evalfn')
 
-        # Checks user response, then removes groups from database if valid.
-        if msg.clean_content.lower() == "cancel":
-            await bot.send_message(ctx.message.channel, "**Canceled!**")
-            await bot.delete_message(rolelist)
-            conn.close()
+            try: # we're gonna see if eval() can run without a problem, otherwise use exec()
+                await self.bot.send_message(ctx.message.channel, "```python\n>>> {} \n{}```".format(msg, eval(arg)))
+                print(">> EVAL: {}".format(msg))
+            except SyntaxError:
+                await self.execfn(ctx, arg)
         else:
-            try:
-                nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">> {} removed groups:".format(ctx.message.author))
-
-                for n in nums: # Deletes one row at a time
-                    await bot.send_typing(ctx.message.channel)
-                    c.execute('DELETE FROM active_groups WHERE role_id=?', (grouplist[n],))
-                    conn.commit()
-                    print("  {} | {}".format(discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])),grouplist[n]))
-
-                await bot.send_message(ctx.message.channel,"🗒️ | **Selected groups have successfully been removed! Type **`c|group list`** to view these roles that users can give themselves.**")
-
-            except ValueError:
-                print(">> A group command was executed, but it failed...")
-                await bot.send_message(ctx.message.channel,"❌ | **Error! That is not a valid response!**")
-
-            finally:
-                await bot.delete_message(rolelist)
-                conn.close()
-
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Must have \"Manage Roles\" and \"Ban Members\" permission in order to use this command!**")
-
-async def joingroup(ctx, x):
-    botperms = ctx.message.channel.permissions_for(ctx.message.server.me)
-
-    if botperms.manage_roles:
-        conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
-        c = conn.cursor()
-
-        s = ""
-        i = 1
-
-        grouplist = [None]
-
-        # Gather all the available role IDs into the list above
-        for row in c.execute('SELECT role_id FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            grouplist.append(int(str(row)[1:-2])) # 'row' variable shows up as '()' if not converted to a string first.
-
-        # Compile the list of role names
-        for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            role = str(row)[2:-3] # Strips the parenthesis and comma from the result
-
-            s += str(i) + ": " + role + "\n"
-            i += 1
-
-        await bot.send_typing(ctx.message.channel)
-        rolelist = await bot.send_message(ctx.message.channel,"```{}```\n🗒️ | **Type the number of the group you would like to join, seperate numbers with a comma if joining more than one. Otherwise, type **`cancel`** to quit.**".format(s))
-        msg = await bot.wait_for_message(author=ctx.message.author,channel=ctx.message.channel)
-
-        # Checks user response, joins groups if valid.
-        if msg.clean_content.lower() == "cancel":
-            await bot.send_message(ctx.message.channel, "**Canceled!**")
-            await bot.delete_message(rolelist)
-            conn.close()
-        else:
-            try:
-                nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">> {} joined the following groups:".format(ctx.message.author))
-
-                for n in nums:
-                    grouprole = discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])) # Finding the role by ID
-                    await bot.add_roles(ctx.message.author, grouprole)
-                    print("  {}".format(grouprole))
-
-                await bot.send_message(ctx.message.channel,"🗒️ | **Successfully joined group(s)!**")
-
-            except ValueError:
-                print(">> A group command was executed, but it failed...")
-                await bot.send_message(ctx.message.channel,"❌ | **Error! That is not a valid response!**")
-
-            finally:
-                await bot.delete_message(rolelist)
-                conn.close()
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! I do not have permission to manage roles!**")
-
-async def leavegroup(ctx, x):
-    botperms = ctx.message.channel.permissions_for(ctx.message.server.me)
-
-    if botperms.manage_roles:
-        conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
-        c = conn.cursor()
-
-        s = ""
-        i = 1
-
-        grouplist = [None]
-
-        # Gather all the available role IDs into the list above
-        for row in c.execute('SELECT role_id FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            grouplist.append(int(str(row)[1:-2])) # 'row' variable shows up as '()' if not converted to a string first.
-
-        # Compile the list of role names
-        for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-            role = str(row)[2:-3] # Strips the parenthesis and comma from the result
-
-            s += str(i) + ": " + role + "\n"
-            i += 1
-
-        await bot.send_typing(ctx.message.channel)
-        rolelist = await bot.send_message(ctx.message.channel,"```{}```\n🗒️ | **Type the number of the group you would like to leave, seperate numbers with a comma if leaving more than one. Otherwise, type **`cancel`** to quit.**".format(s))
-        msg = await bot.wait_for_message(author=ctx.message.author,channel=ctx.message.channel)
-
-        # Checks user response, leaves groups if valid.
-        if msg.clean_content.lower() == "cancel":
-            await bot.send_message(ctx.message.channel, "**Canceled!**")
-            await bot.delete_message(rolelist)
-            conn.close()
-        else:
-            try:
-                nums = [int(s) for s in msg.clean_content.split(',')] # Converts string of numbers to a list of integers
-                print(">> {} left the following groups:".format(ctx.message.author))
-
-                for n in nums:
-                    grouprole = discord.utils.get(ctx.message.server.roles, id=str(grouplist[n])) # Finding the role by ID
-                    await bot.remove_roles(ctx.message.author, grouprole)
-                    print("  {}".format(grouprole))
-
-                await bot.send_message(ctx.message.channel,"🗒️ | **Successfully left group(s)!**")
-
-            except ValueError:
-                print(">> A group command was executed, but it failed...")
-                await bot.send_message(ctx.message.channel,"❌ | **Error! That is not a valid response!**")
-
-            finally:
-                await bot.delete_message(rolelist)
-                conn.close()
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! I do not have permission to manage roles!**")
-
-async def listgroups(ctx, x):
-    conn = sqlite3.connect(os.path.realpath('./db/groups.db'))
-    c = conn.cursor()
-    s = ""
-    i = 1
-
-    print(">> {} listed the groups!".format(ctx.message.author))
-    for row in c.execute('SELECT role_name FROM active_groups WHERE server_id=?', (ctx.message.server.id,)):
-        role = str(row)[2:-3] # Strips the parenthesis and comma from the result
-
-        s += str(i) + ": " + role + "\n"
-        i += 1
-        print("  {}".format(role))
-
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_message(ctx.message.channel,"🗒️ | **Roles that users can gives themselves (groups) are as follows:**\n```{}```".format(s))
-    conn.close()
-
-@bot.command(pass_context=True)
-async def group(ctx, func):
-    """
-    Gives the option to turn any role of choosing into a 'group'
-    that users can join to give themselves that particular role.
-
-    This command is intended to give non-admin users the ability
-    to give themselves roles that they normally would have to ask
-    someone else to in order to get them (color roles, teams, etc.)
-
-    addgroup - Adds roles to the list of groups members can join
-    removegroup - Removes roles from the list of groups members can join
-    joingroup - Assigns roles that user specifies
-    leavegroup - Removes roles that user specifies
-    """
-
-    # Set up a table if one doesn't exist already
-    try:
-        c = conn.cursor()
-        c.execute('''CREATE TABLE active_groups
-                 (server_name text, server_id integer, role_name text, role_id integer)''')
-        conn.commit()
-        print(">> No groups data table found, generating a new one...")
-    except:
-        pass
-
-    # Python doesn't have case switches, so we're just gonna use a dictionary instead.
-    options = {
-        "add": addgroup,
-        "remove": removegroup,
-        "join": joingroup,
-        "leave": leavegroup,
-        "list": listgroups
-    }
-    await options[func](ctx, func)
-
-@group.error
-async def group(error, ctx):
-    print(">> A group command was executed, but it failed...")
-    print(error)
-    await bot.send_message(ctx.message.channel,"❌ | **Invalid Syntax. Proper usage:** `c|group option` **(options: **`add`**, **`remove`**, **`join`**, **`leave`**, **`list`**)**")
+            print(">> {} attempted to use eval command, but failed.".format(ctx.message.author))
 
 
-@bot.command(pass_context=True)
-async def help(ctx):
-    helpmsg = discord.Embed(color=0xe0216a, url=" ", description="All commands must start with **c|** (e.g. *c|help*).")
 
-    helpmsg.set_author(name="🕯️ "+bot.user.name+" Commands")
-    helpmsg.set_footer(text="[Page 1 of 1]")
+    @commands.command(pass_context=True, hidden=True)
+    @commands.is_owner()
+    async def shutdown(self, ctx):
+        """ Shuts the bot down """
+        await self.bot.send_typing(ctx.message.channel)
+        await self.bot.send_message(ctx.message.channel, "🌬️🕯️")
+        log(">> Bot Shutdown Executed", True, type="warning")
 
-    helpmsg.add_field(name="Default:", value="`group` - Provides options for roles that a user can assign themselves without the need of a 'Manage Roles' permission (i.e. voluntary roles like colors and whatnot). Available roles can be configured by an admin. \n`help` - Pulls up this message. \n`ping` - Responds with 'pong!', used to check response time of the bot. \n`someone` - mentions a random user with the included message. \ne.g. *\"c|someone hello there!\"* \n   ")
-    helpmsg.add_field(name="Fun:", value="`madlib` - Walks you through a fill-in-the-blank story.\n`markov` - Randomly generates a markov chain from messages in the chat.\n`trope` - Returns a random TV Tropes page.\n`stack` - Searches StackOverflow with the provided input.\n`overlays` - Lists names of overlay commands that can be run using `c|`\n      ")
-    helpmsg.add_field(name="Utility:", value="`countdown` - Starts a countdown timer that the bot updates in real time. Restricted to one countdown at a time since it's a little finnicky. \ne.g. *\"c|countdown title 01:30:05 #23272A -m\"* (including `-m` makes it mention everyone once finished)\n`invite` - Creates a fancy embedded invite card for people to react to as a way to RSVP for an upcoming event. For syntax information, trigger the command without any arguments (i.e. just type \"c|invite\").\n    ")
-    helpmsg.add_field(name="Admin:", value="`cherrypick` - Purges a given number of messages that meet the provided criteria, which can be either a user or keyword.\ne.g *\"c|cherrypick lasagna 25\"* (the number is how many messages to ***check*** the keyword for, not how many you want to delete) \n`napalm` - Purges 1975 messages in the channel with a fiery napalm. Prompts with a warning before use. \n    ")
-
-    await bot.send_message(ctx.message.author, embed=helpmsg)
+        await self.bot.close()
 
 
-@bot.command(pass_context=True)
-async def ping(ctx):
-    print(">> pong!")
-    channel = ctx.message.channel
-    await bot.send_typing(ctx.message.channel)
 
-    await bot.send_message(channel, "pong!")
+    @reload.error
+    @refresh.error
+    @evalfn.error
+    async def on_maintenance_error(self, ctx, error):
+        log(error, True, type="error")
+        await self.bot.send_message(ctx.message.channel,"❌ | **Error! Please check the console.**")
 
 
-@bot.command(pass_context=True)
-@commands.cooldown(1,8, commands.BucketType.channel)
-async def someone(ctx):
-    channel = ctx.message.channel
-    users = list(ctx.message.server.members) # Grabs a dictionary of users on the server, then converts it to a list
-    msg = ctx.message.content.lstrip('c|someone')
-
-    await bot.send_message(channel,'{}{}'.format(random.choice(users).mention, msg))
-    # The {} gets replaced by the contents of the format function in their corresponding order
-
-@someone.error
-async def someone(error,ctx):
-    print(">> Failed c|someone: {}".format(error))
-    if isinstance(error, commands.CommandOnCooldown):
-        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
-    elif isinstance(error, commands.CheckFailure):
-        pass
+def setup(bot):
+    bot.add_cog(Maintenance(bot))
