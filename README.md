@@ -1,3 +1,4 @@
+**NOTE**: You are currently viewing a legacy version of Can.dl, this version retains code from *before* the bot was updated to support [discord.py v1.0](https://discordpy.readthedocs.io/en/latest/migrating.html).
 <p align="center">
   <img src="https://imgur.com/tF9Gz3I.png" height=350px>
 </p>
