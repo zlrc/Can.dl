@@ -70,59 +70,6 @@ class Admin(commands.Cog):
             await self.bot.send_message(ctx.message.channel,"❌ | **Invalid Syntax. Proper usage:** `c|cherrypick keyword_mode message_limit keyword(s)`")
 
 
-'''
-    @commands.command(pass_context=True)
-    @commands.guild_only()
-    @commands.has_permissions(administrator=True)
-    async def napalm(self, ctx):
-        """ Burns through (deletes) ~2000 messages in a fiery napalm. """
-        bot = self.bot
-        channel = ctx.message.channel
-
-        # Check for permissions first
-        if ctx.message.author.server_permissions.administrator: # Person using this command is an admin
-            await bot.send_message(channel, "⚠️ | **Warning! Are you sure you want to napalm this channel? It will delete A LOT of messages on here, type** `yes` **or** `cancel` **to proceed.**")
-            msg = await bot.wait_for_message(author=ctx.message.author,channel=channel)
-
-            # Confirmation 1
-            if msg.clean_content.lower() == "yes": # clean_content.lower() converts everything to lowercase
-                await bot.send_message(channel, "⚠️ | **Are you REAAAALLLLY sure? \nType the following launch code EXACTLY to confirm:** `FortunateSon55`")
-                msg2 = await bot.wait_for_message(author=ctx.message.author,channel=channel)
-
-                # Confirmation 2
-                if msg2.clean_content == "FortunateSon55":
-                    print (">> {} activated c|napalm".format(ctx.message.author))
-                    await bot.send_message(channel, "💣 | **Firing the napalms...**")
-
-                    # Fire ahoy
-                    await bot.send_typing(channel)
-                    for i in range(5): # sends 5 messages in a row
-                        napalmstr = ""
-                        for i in range(2000): # each message has 2000 flame emojis
-                            napalmstr += "🔥"
-                        await bot.send_message(ctx.message.channel, napalmstr)
-
-                    i = 1975
-                    while i > 0:
-                        await bot.purge_from(ctx.message.channel, limit=395)
-                        i -= 395
-
-                    await asyncio.sleep(5)
-                    await bot.send_message(channel, "💀 | **Press F to pay respects.**")
-
-                else:
-                    await bot.send_message(channel, "❌ | **Failed to input correct launch code, ceasing operations...**")
-                    return
-            elif msg.clean_content.lower() == "cancel":
-                await bot.send_message(channel, "**Canceled!**")
-                return
-            else:
-                await bot.send_message(channel, "❌ | **That is not a valid response! Please re-enter the command and try again.**")
-                return
-        else:
-            await bot.send_message(channel, "❌ | **You do not have permission to use that command!**")
-'''
-
 
 
 def setup(bot):
