@@ -10,8 +10,8 @@ descriptions = {
     "fun": {
         "madlib": "Walks you through a fill-in-the blank story.",
         "markov": "Generates a Markov Chain from recent messages.",
-        "trope": "Searches Stack Overflow and returns the top result.",
-        "stack": "Returns a random tv tropes page."
+        "stack": "Searches Stack Overflow and returns the top result.",
+        "trope": "Returns a random tv tropes page."
     },
 
     "overlay": {

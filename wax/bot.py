@@ -19,15 +19,17 @@ class Candl(commands.Bot):
         self.command_prefix = config["prefix"]
         self.debug_mode = config["debugModeEnabled"]
         self.modules = [key for key in filter(lambda i: config["active_modules"][i], config["active_modules"])]
+        self.keys = config["api_keys"]
 
         # Instantiate the bot
         builtins.bot = super().__init__(command_prefix=self.command_prefix, *args, **kwargs)
+        self.init_api_keys()
         self.create_db()
         self.load_cog(*self.modules)
 
 
 
-    # Startup Functions
+    ### Startup Functions ######################################################
     def run(self):
         """ Connects the bot to discord """
         self.client = discord.Client()
@@ -38,7 +40,7 @@ class Candl(commands.Bot):
         print('Logged in as')
         print(self.user.name)
         print(self.user.id)
-        print('------')
+        print('------ discord.py v' + discord.__version__ + ' ------')
 
         # Check if debug mode is enabled
         if self.debug_mode:
@@ -53,20 +55,23 @@ class Candl(commands.Bot):
 
     async def on_message(self, msg):
         """ Runs a few checks before its superclass handles the call """
-        if self.debug_mode and await self.is_owner(msg.author) == False:
+        if self.debug_mode and await self.is_owner(msg.author) == False: # disables input in debug mode
             return
         else:
             await super().on_message(msg)
+            if self.private_cog is not None:
+                await self.private_cog.on_message(msg)
 
 
 
-    # Cogs
+    ### Cogs ###################################################################
     def load_cog(self, *cogs):
         """ Loads modules passed through cogs parameter """
         for name in cogs:
             path = "modules." + name
             self.load_extension(path)
             log("Cog Loaded: {}".format(name))
+        self.private_cog = self.get_cog("Private")
 
     def reload_cog(self, name):
         """ Reloads the given modules """
@@ -83,7 +88,14 @@ class Candl(commands.Bot):
 
 
 
-    # Analytics
+    ### Third-party APIs #######################################################
+    def init_api_keys(self):
+        """ Initializes APIs using their respective keys. """
+        pass
+
+
+
+    ### Analytics ##############################################################
     def create_db(self):
         """ Sets up the database that tracks usage frequency """
         usage_db = sqlite3.connect(os.path.realpath('db/bot_usage.db'))
@@ -114,7 +126,8 @@ class Candl(commands.Bot):
         log("Invoke has been logged as: {}".format(data), type="debug")
 
 
-    # Misc. Functions
+
+    ### Misc. Functions ########################################################
     async def send_message(self, channel, message=None, **kwargs):
         """ A legacy command that makes updating to rewrite less painful """
         emb = kwargs.pop("embed", None)
