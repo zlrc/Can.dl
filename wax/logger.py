@@ -26,6 +26,11 @@ class Tee(object):
             if not obj == "\n":
                 discordLogger.info(obj) # logs to file
 
+    def flush(self):
+        for f in self.files: f.flush()
+        for h in discordLogger.handlers: h.flush()
+
+
 backup = sys.stdout # sys.stdout = backup to revert back to printing to console only
 sys.stdout = Tee(sys.stdout)
 
