@@ -1,30 +1,41 @@
 <p align="center">
-  <img src="https://imgur.com/tF9Gz3I.png" height=350px>
+  <img src="https://user-images.githubusercontent.com/30582227/71788525-01ed6d00-2fd8-11ea-9a63-4996beee8a75.png" height=350px>
 </p>
 
-# Can.dl Discord Bot
-A personal, niche-purpose bot with features intended to fit specific needs of small to moderate-sized servers. Works best when paired with another bot that comes with a standard set of commands.
+---
+
+A personal, niche-purpose Discord bot. Mostly comes with entertainment features, so it works best when paired with other bots.
+
+---
 
 ## Notable Features
-`c|group join/leave`: Allows users to give themselves decorative roles without having to ask someone with a "Manage Roles" permission each time. Admins can choose which roles users are allowed to give themselves.
+Can.dl uses the `c|` prefix for all of it's commands.
 
-<p align="center"><img src="https://imgur.com/NyXfOPq.png"></p>
+`c|vrole request/revoke`: Allows users to give themselves vanity roles without having to ask someone with a "Manage Roles" permission each time. Admins can choose which roles users are allowed to give themselves.
+
+<p align="center"><img src="https://user-images.githubusercontent.com/30582227/71790656-6adbe180-2fe6-11ea-991a-cf2b94c7a6f8.gif"></p>
 
 `c|invite`: Creates an embed that's customized to look like an invite card for people to RSVP with. Users can configure embed colors, user limit, and embed images with this command. Management tools for invite creators will be added in the future.
 
-<p align="center"><img src="https://imgur.com/bLVCJet.png"></p>
+<p align="center"><img src="https://user-images.githubusercontent.com/30582227/71790658-6b747800-2fe6-11ea-82ab-2cdfe73dcdf5.gif"></p>
 
-`c|countdown`: Starts a customized countdown timer. Longer countdowns aren't as accurate in this command's current state, but it works.
+`c|countdown`: Starts a customized countdown timer. The amount of timers running at the same time is limited to one per server.
 
-<p align="center"><img src="https://imgur.com/SbJ4Rwy.png"></p>
+<p align="center"><img src="https://user-images.githubusercontent.com/30582227/71790519-bfcb2800-2fe5-11ea-9640-9f7af171fb8d.gif"></p>
+
+**Overlays** - Type `c|overlays` to see a list of overlay commands available for this bot. If hosting your own instance of the bot, edit `overlays.py` to add your own custom overlays.
+
+**Markov Chains** - `c|markov` uses "AI Magic" to string together new messages using those that exist on the server. The command takes `@mention` parameters to specify a user or channel to generate messages from.
+
+**Fill-in-the-Blanks** - Start a game of Mad Libs by typing `c|madlib`. See the examples in `/db/madlibs` to learn how you can create your own!
 
 ## How to Invite
-Can.dl is a little bot with little power. Since the machine that it's hosted on isn't all that powerful, the bot is currently limited to private access. You're free to use the source code provided here to set up your own bot though, granted that you know how to do that.
+Can.dl is currently limited to private access, but you're free to use the source code provided here to host your own! Granted, it must use a different name and avatar to avoid confusion.
 
 ## Hosting your own Bot
-The code for this bot runs on Python 3. You should be allowed to use the code freely under the license that's included for your own bot. For in-depth help on how to actually make a discord bot, I'd suggest looking up [online tutorials](https://medium.com/@moomooptas/how-to-make-a-simple-discord-bot-in-python-40ed991468b4) and the [discord.py documentation](https://discordpy.readthedocs.io/en/latest/api.html) rather than here.
+The code for this bot runs on **Python 3**. You should be allowed to use the code freely under the license that's included. For in-depth help on how to actually make a discord bot, I'd suggest looking up [online tutorials](https://medium.com/@moomooptas/how-to-make-a-simple-discord-bot-in-python-40ed991468b4) and the [discord.py documentation](https://discordpy.readthedocs.io/en/latest/api.html) rather than here.
 
-Once you're all set up, run `run.py` to boot up the bot.
+Once all the Discord API stuff is configured, type `python3 run.py` in your command line to boot up the bot.
 
 ### Dependencies:
 - Python 3
@@ -33,8 +44,7 @@ Once you're all set up, run `run.py` to boot up the bot.
 - [Markovify](https://github.com/jsvine/markovify)
 - [Pillow](https://pillow.readthedocs.io/en/stable/installation.html)
 
-<i style="font-size: 10.5pt; color: rgb(200,0,0)">* Please let me know if there are any other dependencies that I need to include.</i>
+See `requirements.txt` for a full list of required Python packages and their respective versions.
 
-[groups]: https://imgur.com/NyXfOPq.png
-[invite]: https://imgur.com/bLVCJet.png
-[countdown]: https://imgur.com/SbJ4Rwy.png
+## Licensing
+[![MIT License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/zlrc/Can.dl/blob/master/LICENSE)
