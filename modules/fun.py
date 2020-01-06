@@ -1,295 +1,268 @@
 # "Fun" Commands, typically generators and search queries
 import discord
 from discord.ext import commands
-from builtins import bot
-from math import floor
-import asyncio
 import aiohttp
-from io import BytesIO
-import re
+from asyncio import TimeoutError
 import requests
 import random
 from bs4 import BeautifulSoup
-from PIL import Image
 import markovify
 import os
+import wax.helpers as h_
+from wax.logger import log
 
+class Fun(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.madlib_running = {}
 
-def convert_to_url(url):
+    # Mad Libs
+    def get_lib_template(self):
+        """ Returns a random lib from the db/madlibs folder """
+        rand_file = "db/madlibs/" + random.choice(os.listdir("db/madlibs"))
+        with open(rand_file,"r") as file:
+            # Returns the title of the lib, number of blanks, and the story itself.
+            title = file.readline().strip('\n')
+            blanks = file.readline().strip('\n')
+            text = file.readline()
+            return title, blanks, text
 
-    # Use regex to remove anything that isn't a number or letter
-    url = re.sub(r"[^\w\s]", '', url)
+    async def get_lib_input(self, channel, wclass, index, total):
+        """ Asks users for the given word class and returns the first response it gets """
+        bot = self.bot
 
-    # Substitute spaces with a '+' symbol
-    url = re.sub(r"\s+", '+', url)
+        await bot.send_message(channel,"📜 | **[{}/{}] Please give me a** ***{}***".format(index, total, wclass))
 
-    return url
-
-async def get_img(ctx):
-    """Returns the most recent attachment posted to the channel"""
-
-    # regex to check if there is an image url within the message
-    url_regex = r'(\b(?:(?:https?)|(?:ftp)|(?:file)):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*(?:(?:\.jpg)|(?:\.jpeg)|(?:\.png)|(?:\.gif)))'
-
-    log = bot.logs_from(ctx.message.channel, 50) # check last 50 messages
-    async for i in log:
-        if i.attachments: # if the message has an attachment
-            url = i.attachments[0]['url'] # attachment url
-        elif re.search(url_regex,i.clean_content,flags=re.IGNORECASE): # look for url using regex
-            url = re.search(url_regex,i.clean_content,flags=re.IGNORECASE).group(0)
+        def is_valid(m):
+            return ((m.author != bot.user) and (not (m.attachments or 'c|' in m.clean_content))) and m.channel == channel
 
         try:
-            async with aiohttp.get(url) as r: # access the url
-                if r.status == 200:
-                    return BytesIO(await r.read())
-        except:
-            pass
+            input = await bot.wait_for('message', check=is_valid, timeout=300)
+            return input.clean_content # .partition(' ')[0] to grab the first word only
+        except TimeoutError:
+            return '> CANCEL'
 
-def abs_path(path):
-    """Returns absolute path of file given"""
-    script_dir = os.path.dirname(__file__) # absolute path of fun.py
-    rel_path = path # relative path
-    return os.path.join(script_dir, rel_path) # absolute path of file
+    @commands.command(pass_context=True)
+    @commands.guild_only()
+    async def madlib(self, ctx):
+        """ Walks you through a fill-in-the blank story. """
+        bot = self.bot
+
+        if ctx.message.guild.id in self.madlib_running:
+            await bot.send_message(ctx.message.channel, "❌ | **There's already a story in progress! Type** `> CANCEL` **to end it.**")
+            return
+
+        self.madlib_running[ctx.message.guild.id] = True
+        await bot.send_message(ctx.message.channel,"```A lib has started!\nType \"> CANCEL\" to stop.```")
+        title, total_blanks, template_string = self.get_lib_template()
+        new_string = ""
+        progress = 0
+
+        # Loop through each word, replace the ones with spoiler tags
+        for index, word in enumerate(template_string.split('_')):
+            if (word[0:2] == '||'): # if the word has spoiler tags
+                progress += 1
+
+                input_string = await self.get_lib_input(ctx.message.channel, word.strip('|'), progress, total_blanks)
+
+                if (input_string == '> CANCEL'):
+                    await bot.send_message(ctx.message.channel,"📜 | **Canceled! Here is what you had up to this point:**")
+                    break
+
+                new_string += "||" + input_string + "||"
+            else:
+                new_string += word
+
+        await bot.send_message(ctx.message.channel,"```{}```{}```-- END --```".format(title,new_string))
+        self.madlib_running.pop(ctx.message.guild.id)
+
+    @madlib.error
+    async def madlib_error(self, ctx, error):
+        log(">> {} attempted to run c|madlib, but failed: {}".format(ctx.message.author,error), True, type="error")
+        log(type="trace")
 
 
 
-## Mad Libs
-def get_lib_template():
-    """Returns a random lib from the db/madlibs folder"""
-    rand_file = "db/madlibs/" + random.choice(os.listdir("db/madlibs"))
-    with open(rand_file,"r") as file:
-        # Returns the title of the lib, number of blanks, and the story itself.
-        title = file.readline().strip('\n')
-        blanks = file.readline().strip('\n')
-        text = file.readline()
-        return title, blanks, text
+    # Markov Chains
+    def tomarkov(self, string):
+        """ Returns a randomly generated sentence from the string provided """
 
-async def get_lib_input(channel, wclass, index, total):
-    """Asks users for the given word class and returns the first response it gets"""
-    await bot.send_message(channel,"📜 | **[{}/{}] Please give me a** ***{}***".format(index, total, wclass))
+        # Generate a random state size between 2 and 4
+        #states = random.randint(2,4)
 
-    def is_valid(m):
-        return ((m.author != bot.user) and (not m.attachments))
+        # Build the model
+        string_model = markovify.NewlineText(string, retain_original=True, state_size=2)
 
-    input = await bot.wait_for_message(channel=channel, check=is_valid)
-    return input.clean_content # .partition(' ')[0] to grab the first word only
+        # Construct the requested sentence(s)
+        markov_string = ""
+        for i in range(random.randint(1,5)): # 1 to 5 sentences are strung together
+            markov_string += str(string_model.make_sentence(tries=100)) + "\n"
 
-@bot.command(pass_context=True)
-@commands.cooldown(1,45, commands.BucketType.channel)
-async def madlib(ctx):
-    await bot.send_message(ctx.message.channel,"```A lib has started!\nType \"> CANCEL\" to stop.```")
-    title, total_blanks, template_string = get_lib_template()
-    new_string = ""
-    progress = 0
-
-    # Loop through each word, replace the ones with spoiler tags
-    for index, word in enumerate(template_string.split('_')):
-        if (word[0:2] == '||'): # if the word has spoiler tags
-            progress += 1
-            input_string = await get_lib_input(ctx.message.channel, word.strip('|'), progress, total_blanks)
-
-            if (input_string == '> CANCEL'):
-                await bot.send_message(ctx.message.channel,"📜 | **Canceled! Here is what you had up to this point:**")
-                break
-
-            new_string += "||" + input_string + "||"
+        # Return the final string
+        if "None" in markov_string:
+            return "❌ | **Error! Failed to generate markov chain, post some more before trying again.**"
         else:
-            new_string += word
+            return markov_string;
 
-    await bot.send_message(ctx.message.channel,"```{}```{}```-- END --```".format(title,new_string))
+    async def markovuser(self, message, member, target_channel):
+        """ Runs when c|markov is targeted to a particular user """
+        bot = self.bot
 
-@madlib.error
-async def madlib(error,ctx):
-    print(">> {} attempted to run c|madlib, but failed: {}".format(ctx.message.author,error))
-    if isinstance(error, commands.CommandOnCooldown):
-        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+        async with message.channel.typing():
+            log = target_channel.history(limit=5000) # grabs last n messages
 
+            # Put all of the valid messages together as a single string
+            string = ""
+            async for i in log: # for every message in the log
+                if (i.author.id == member.id) and (not "c|" in i.clean_content):
+                    string += i.clean_content + "\n"
 
+            # Generate chain from messages, keep trying if there's an error
+            msg = self.tomarkov(string)
+            attempts = 1
+            while ("❌ |" in msg) and (attempts <= 5):
+                print("    >> Failed, trying again... ({}/5)".format(attempts) )
+                log = target_channel.history(limit=5000+(1000*attempts))
+                #start = 5000 + ( 1000*(attempts-1) )
 
-## Markov Chains
-def tomarkov(string):
-    """Returns a randomly generated sentence from the string provided"""
-
-    # Generate a random state size between 2 and 4
-    #states = random.randint(2,4)
-
-    # Build the model
-    string_model = markovify.NewlineText(string, retain_original=True, state_size=2)
-
-    # Construct the requested sentence(s)
-    markov_string = ""
-    for i in range(random.randint(1,5)): # 1 to 5 sentences are strung together
-        markov_string += str(string_model.make_sentence(tries=100)) + " "
-
-    # Return the final string
-    if "None" in markov_string:
-        return "❌ | **Error! Failed to generate markov chain, post some more before trying again.**"
-    else:
-        return markov_string;
-
-async def markovuser(message, member, target_channel):
-    """Runs when c|markov is targeted to a particular user"""
-    log = bot.logs_from(target_channel, 5000) # grabs last n messages
-
-    # Put all of the valid messages together as a single string
-    string = ""
-    async for i in log: # for every message in the log
-        if (i.author.id == member.id) and (not "c|" in i.clean_content):
-            string += i.clean_content + "\n"
-
-    # Generate chain from messages, keep trying if there's an error
-    msg = tomarkov(string)
-    attempts = 1
-    while ("❌ |" in msg) and (attempts <= 5):
-        print("    >> Failed, trying again... ({}/5)".format(attempts) )
-        await bot.send_typing(message.channel)
-        log = bot.logs_from(target_channel, 5000+(1000*attempts))
-        #start = 5000 + ( 1000*(attempts-1) )
-
-        string = ""
-        async for i in log:
-            if (i.author.id == member.id) and (not "c|" in i.clean_content):
-                string += i.clean_content + "\n"
-        msg = tomarkov(string)
-        attempts += 1
+                string = ""
+                async for i in log:
+                    if (i.author.id == member.id) and (not "c|" in i.clean_content):
+                        string += i.clean_content + "\n"
+                msg = self.tomarkov(string)
+                attempts += 1
 
 
-    # Create an embed to simulate a user quote
-    embed = discord.Embed(color=member.color, description=msg)
-    embed.set_author(name=member.display_name, icon_url=member.avatar_url[:-15])
+            # Create an embed to simulate a user quote
+            embed = discord.Embed(color=member.color, description=msg)
+            embed.set_author(name=member.display_name, icon_url=member.avatar_url)
 
-    # Send results
-    await bot.send_typing(message.channel)
-    await bot.send_message(message.channel,embed=embed)
+            # Send results
+            await bot.send_message(message.channel,embed=embed)
 
-async def markovchannel(message, target_channel):
-    """Runs when c|markov is targeted to a particular channel"""
-    log = bot.logs_from(target_channel, 1000) # grabs last n messages
+    async def markovchannel(self, message, target_channel):
+        """ Runs when c|markov is targeted to a particular channel """
+        bot = self.bot
 
-    # Put all of the valid messages together as a single string
-    string = ""
-    async for i in log: # for every message in the log
-        if (i.author != bot.user) and (not "c|" in i.clean_content):
-            string += i.clean_content + "\n"
+        async with message.channel.typing():
+            log = target_channel.history(limit=1000) # grabs last n messages
+            
+            # Put all of the valid messages together as a single string
+            string = ""
+            async for i in log: # for every message in the log
+                if (i.author != bot.user) and (not "c|" in i.clean_content):
+                    string += i.clean_content + "\n"
 
-    # Send results
-    await bot.send_typing(message.channel)
-    await bot.send_message(message.channel, tomarkov(string) )
+            # Send results
+            await bot.send_message(message.channel, self.tomarkov(string) )
 
-@bot.command(pass_context=True)
-@commands.cooldown(2,20, commands.BucketType.channel)
-async def markov(ctx, user=None, chan=None):
-    """ Generates a Markov Chain from recent messages."""
+    @commands.command(pass_context=True)
+    @commands.guild_only()
+    @commands.cooldown(2,20, commands.BucketType.channel)
+    async def markov(self, ctx, user=None, chan=None):
+        """ Generates a Markov Chain from recent messages. """
+        bot = self.bot
 
-    print(">> {} requested a markov chain, processing...".format(ctx.message.author)) # log command usage
+        print(">> {} requested a markov chain, processing...".format(ctx.message.author)) # log command usage
 
-    # Convert channel to an object we can work with
-    if chan: # sets default channel if one isn't provided
-        chan = ctx.message.server.get_channel(chan[2:-1])
-    else:
-        chan = ctx.message.channel
+        # Convert channel to an object we can work with
+        if chan: # sets default channel if one isn't provided
+            chan = ctx.message.guild.get_channel(int(chan[2:-1]))
+        else:
+            chan = ctx.message.channel
 
-    await bot.send_typing(ctx.message.channel)
 
-    def user_is(type, u): # bypasses TypeError exception when user=None
-        if type == "channel":
-            try:
-                if ctx.message.server.get_channel(u[2:-1]):
-                    return True
-                else:
+        def user_is(type, u): # bypasses TypeError exception when user=None
+            if type == "channel":
+                try:
+                    if ctx.message.guild.get_channel(int(u[2:-1])):
+                        return True
+                    else:
+                        return False
+                except TypeError:
                     return False
-            except TypeError:
-                return False
-        elif type == "member":
-            try:
-                if ctx.message.server.get_member_named(user):
-                    return True
-                else:
+            elif type == "member":
+                try:
+                    if ctx.message.guild.get_member_named(user):
+                        return True
+                    else:
+                        return False
+                except TypeError:
                     return False
-            except TypeError:
-                return False
 
-    # Compile a string of messages that meet the criteria
-    if ctx.message.mentions: # checks if a mention was used
-        await markovuser(ctx.message, ctx.message.mentions[0], chan)
-    elif user_is("member", user): # if mention wasn't used to find user
-        await markovuser(ctx.message, ctx.message.server.get_member_named(user), chan)
-    elif user_is("channel", user): # if a channel was given without user mention
-        await markovchannel(ctx.message, ctx.message.server.get_channel(user[2:-1]))
-    else:
-        log = bot.logs_from(ctx.message.channel, 800) # grabs last n messages
+        # Compile a string of messages that meet the criteria
+        if ctx.message.mentions: # checks if a mention was used
+            await self.markovuser(ctx.message, ctx.message.mentions[0], chan)
+        elif user_is("member", user): # if mention wasn't used to find user
+            await self.markovuser(ctx.message, ctx.message.guild.get_member_named(user), chan)
+        elif user_is("channel", user): # if a channel was given without user mention
+            await self.markovchannel(ctx.message, ctx.message.guild.get_channel(int(user[2:-1])))
+        else:
+            async with ctx.message.channel.typing():
+                log = ctx.message.channel.history(limit=800) # grabs last n messages
 
-        # Put all of the valid messages together as a single string
-        string = ""
-        async for i in log: # for every message in the log
-            if (i.author != bot.user) and (not "c|" in i.clean_content):
-                string += i.clean_content + "\n"
+                # Put all of the valid messages together as a single string
+                string = ""
+                async for i in log: # for every message in the log
+                    if (i.author != bot.user) and (not "c|" in i.clean_content):
+                        string += i.clean_content + "\n"
 
-        # Send results
+                # Send results
+                await bot.send_message(ctx.message.channel, self.tomarkov(string) )
+
+    @markov.error
+    async def markov_error(self, ctx, error):
+        log(">> {} attempted to run c|markov, but failed: {}".format(ctx.message.author,error), True, type="error")
+        if isinstance(error, commands.CommandOnCooldown):
+            await self.bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
+        elif isinstance(error, commands.CheckFailure):
+            pass
+        else:
+            log(type="trace")
+            await self.bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user #channel` **(user and channel optional)**")
+
+
+
+    # Stack Overflow Lookup
+    @commands.command(pass_context=True)
+    @commands.guild_only()
+    async def stack(self, ctx, *,args):
+        """ Searches Stack Overflow and returns the top result. """
+        search_url = requests.get("https://stackoverflow.com/search?q=" + h_.convert_to_url(args))
+        soup = BeautifulSoup(search_url.content, "html.parser")
+        await self.bot.send_typing(ctx.message.channel)
+
+        # Find the first <a> element that has the URL we need, convert to a url.
+        top_result = soup.find('a', {'class': "question-hyperlink"})
+        result_url = "https://stackoverflow.com" + top_result.get('href')
+
+        await self.bot.send_message(ctx.message.channel, "{}".format(result_url))
+
+    @stack.error
+    async def stack_error(self, ctx, error):
+        log(">> c|stack: {}".format(error), type="error")
+        await self.bot.send_message(ctx.message.channel,"❌ | **Please enter a valid search query!**")
+
+
+
+    # TV Tropes
+    @commands.command(pass_context=True)
+    @commands.guild_only()
+    async def trope(self, ctx, *,args=None):
+        """ Returns a random tv tropes page. """
+        bot = self.bot
         await bot.send_typing(ctx.message.channel)
-        await bot.send_message(ctx.message.channel, tomarkov(string) )
 
-@markov.error
-async def markov(error,ctx):
-    print(">> {} attempted to run c|markov, but failed: {}".format(ctx.message.author,error))
-    if isinstance(error, commands.CommandOnCooldown):
-        await bot.send_message(ctx.message.channel,"❌ | **{}**".format(error))
-    elif isinstance(error, commands.CheckFailure):
-        pass
-    else:
-        await bot.send_message(ctx.message.channel,"❌ | **Error! Proper Syntax:** `c|markov @user #channel` **(user and channel optional)**")
+        if not args:
+
+            # Opens up a random page through a special url, saves it as the variable: "url"
+            async with aiohttp.ClientSession() as sess:
+                async with sess.get("http://tvtropes.org/pmwiki/randomitem.php?p="+str(random.randint(1,9999999999))) as url:
+                    await bot.send_message(ctx.message.channel, "{}".format(url.url))
 
 
 
-## Stack Overflow Lookup
-@bot.command(pass_context=True)
-async def stack(ctx, *,args):
-    """
-    Searches Stack Overflow and returns the top result.
-    """
-    search_url = requests.get("https://stackoverflow.com/search?q=" + convert_to_url(args))
-    soup = BeautifulSoup(search_url.content, "html.parser")
-    await bot.send_typing(ctx.message.channel)
-
-    # Find the first <a> element that has the URL we need, convert to a url.
-    top_result = soup.find('a', {'class': "question-hyperlink"})
-    result_url = "https://stackoverflow.com" + top_result.get('href')
-
-    await bot.send_message(ctx.message.channel, "{}".format(result_url))
-
-@stack.error
-async def stack(error,ctx):
-    print(">> c|stack: {}".format(error))
-    await bot.send_message(ctx.message.channel,"❌ | **Please enter a valid search query!**")
 
 
-
-## TV Tropes
-@bot.command(pass_context=True)
-async def trope(ctx, *,args=None):
-    """
-    Returns a random tv tropes page.
-    """
-    await bot.send_typing(ctx.message.channel)
-
-    if not args:
-
-        # Opens up a random page through a special url, saves it as the variable: "url"
-        async with aiohttp.get("http://tvtropes.org/pmwiki/randomitem.php?p="+str(random.randint(1,9999999999))) as url:
-            await bot.send_message(ctx.message.channel, "{}".format(url.url))
-
-
-
-## Overlay Commands
-from modules.overlay import overlay_list
-
-@bot.command(pass_context=True)
-async def overlays(ctx):
-    m = "🗒️ | **Available Overlays:**\n```"
-
-    for i in overlay_list:
-        m += i + ", "
-
-    msg = m.rstrip(", ") + "```"
-    await bot.send_typing(ctx.message.channel)
-    await bot.send_message(ctx.message.channel,msg)
+def setup(bot):
+    bot.add_cog(Fun(bot))
